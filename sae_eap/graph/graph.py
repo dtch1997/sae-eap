@@ -21,13 +21,11 @@ class Graph:
 
     @property
     def nodes(self) -> Sequence[Node]:
-        """Dictionary of (node_name, node) pairs."""
-        raise NotImplementedError
+        return list(self.graph.nodes)
 
     @property
     def edges(self) -> Sequence[Edge]:
-        """Dictionary of (edge_name, edge) pairs."""
-        raise NotImplementedError
+        return list(self.graph.edges)
 
     @property
     def n_forward_nodes(self) -> int:
@@ -75,15 +73,11 @@ class Graph:
 
     def add_node(self, node: Node) -> None:
         """Add a node to the graph."""
-        raise NotImplementedError
+        self.graph.add_node(node)
 
     def add_edge(self, edge: Edge) -> None:
         """Add an edge to the graph."""
-        # NOTE: This should do a few things:
-        # 1. Add the edge to the graph.
-        # 2. Add the child to the parent's children.
-        # 3. Add the parent to the child's parents.
-        raise NotImplementedError
+        self.graph.add_edge(edge.parent, edge.child)
 
     def remove_node(self, node: Node) -> None:
         """Remove a node from the graph."""

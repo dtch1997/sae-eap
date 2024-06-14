@@ -40,23 +40,28 @@ def add_layer_nodes_and_edges(
     graph: Graph,
     layer: int,
     prev_layers_nodes: list[Node],
-    parallel_attn_mlp: bool = False,
 ) -> list[Node]:
     """Add edges for a single layer."""
 
+    # In a given layer, we have n_heads attention nodes and 1 MLP node
     attn_nodes = [AttentionNode(layer, head) for head in range(graph.cfg.n_heads)]
     mlp_node = MLPNode(layer)
+
     # Add the nodes
     for node in attn_nodes:
         graph.add_node(node)
     graph.add_node(mlp_node)
 
+    # Add the edges
     for node in prev_layers_nodes:
         for attn_node in attn_nodes:
             add_attn_edges(graph, node, attn_node)
         add_non_attn_edge(graph, node, mlp_node)
 
-    if not parallel_attn_mlp:
+    # NOTE: Some models have parallel attention and MLP blocks.
+    # This means that the attention nodes are not connected to the MLP node.
+    # See: https://arxiv.org/abs/2207.02971
+    if not graph.cfg.parallel_attn_mlp:
         # The attention nodes are connected to the MLP node
         for attn_node in attn_nodes:
             add_non_attn_edge(graph, attn_node, mlp_node)
@@ -79,13 +84,16 @@ def build_graph(
     cfg = parse_model_or_config(model_or_config)
     graph = Graph(cfg)
 
+    # Add the input node
     input_node = InputNode()
     graph.add_node(input_node)
-    residual_stream: list[Node] = [input_node]
 
+    # Add the intermediate nodes
+    residual_stream: list[Node] = [input_node]
     for layer in range(graph.cfg.n_layers):
         residual_stream = add_layer_nodes_and_edges(graph, layer, residual_stream)
 
+    # Add the logit node
     logit_node = LogitNode(graph.cfg.n_layers)
     for node in residual_stream:
         add_non_attn_edge(graph, node, logit_node)
