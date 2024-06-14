@@ -6,11 +6,9 @@ authors = [{ name = "Daniel Tan", email = "dtch1997@users.noreply.github.com" }]
 dependencies = [
     "pre-commit>=3.7.1",
     "transformer-lens<2.0.0",
-    "transcoders-slim>=0.2.1",
     "sae-lens>=3.3.0",
     "ipykernel>=6.29.4",
     "pygraphviz>=1.13",
-    "cmapy>=0.6.6",
     "tensordict>=0.4.0",
     "networkx>=3.3",
 ]

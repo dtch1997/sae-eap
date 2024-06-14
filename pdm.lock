@@ -5,7 +5,7 @@
 groups = ["default", "test"]
 strategy = ["cross_platform", "inherit_metadata"]
 lock_version = "4.4.1"
-content_hash = "sha256:7aa0342f987c1651220371cb194f47f13daf411ca9f35755682cca771756fb4e"
+content_hash = "sha256:7a24ddd1ed3cda83016c4212dda397dee0beca6a9eeb0bc240f3c0821e7f8889"
 
 [[package]]
 name = "accelerate"
@@ -311,21 +311,6 @@ groups = ["default"]
 files = [
     {file = "cloudpickle-3.0.0-py3-none-any.whl", hash = "sha256:246ee7d0c295602a036e86369c77fecda4ab17b506496730f2f576d9016fd9c7"},
     {file = "cloudpickle-3.0.0.tar.gz", hash = "sha256:996d9a482c6fb4f33c1a35335cf8afd065d2a56e973270364840712d9131a882"},
-]
-
-[[package]]
-name = "cmapy"
-version = "0.6.6"
-requires_python = ">=2.7"
-summary = "Use Matplotlib colormaps with OpenCV in Python."
-groups = ["default"]
-dependencies = [
-    "matplotlib",
-    "numpy",
-    "opencv-python>=3.3",
-]
-files = [
-    {file = "cmapy-0.6.6.tar.gz", hash = "sha256:cb52a6b3057c49a146fb0964b8302f2fb7d61dfe6ae6de1a98b636aace805255"},
 ]
 
 [[package]]
@@ -1457,31 +1442,6 @@ marker = "platform_system == \"Linux\" and platform_machine == \"x86_64\""
 files = [
     {file = "nvidia_nvtx_cu12-12.1.105-py3-none-manylinux1_x86_64.whl", hash = "sha256:dc21cf308ca5691e7c04d962e213f8a4aa9bbfa23d95412f452254c2caeb09e5"},
     {file = "nvidia_nvtx_cu12-12.1.105-py3-none-win_amd64.whl", hash = "sha256:65f4d98982b31b60026e0e6de73fbdfc09d08a96f4656dd3665ca616a11e1e82"},
-]
-
-[[package]]
-name = "opencv-python"
-version = "4.10.0.82"
-requires_python = ">=3.6"
-summary = "Wrapper package for OpenCV python bindings."
-groups = ["default"]
-dependencies = [
-    "numpy>=1.17.0; python_version >= \"3.7\"",
-    "numpy>=1.17.3; python_version >= \"3.8\"",
-    "numpy>=1.19.3; python_version >= \"3.6\" and platform_system == \"Linux\" and platform_machine == \"aarch64\"",
-    "numpy>=1.19.3; python_version >= \"3.9\"",
-    "numpy>=1.21.2; python_version >= \"3.10\"",
-    "numpy>=1.21.4; python_version >= \"3.10\" and platform_system == \"Darwin\"",
-    "numpy>=1.23.5; python_version >= \"3.11\"",
-]
-files = [
-    {file = "opencv-python-4.10.0.82.tar.gz", hash = "sha256:dbc021eaa310c4145c47cd648cb973db69bb5780d6e635386cd53d3ea76bd2d5"},
-    {file = "opencv_python-4.10.0.82-cp37-abi3-macosx_11_0_arm64.whl", hash = "sha256:5f78652339957ec24b80a782becfb32f822d2008a865512121fad8c3ce233e9a"},
-    {file = "opencv_python-4.10.0.82-cp37-abi3-macosx_12_0_x86_64.whl", hash = "sha256:e6be19a0615aa8c4e0d34e0c7b133e26e386f4b7e9b557b69479104ab2c133ec"},
-    {file = "opencv_python-4.10.0.82-cp37-abi3-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:5b49e530f7fd86f671514b39ffacdf5d14ceb073bc79d0de46bbb6b0cad78eaf"},
-    {file = "opencv_python-4.10.0.82-cp37-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:955c5ce8ac90c9e4636ad7f5c0d9c75b80abbe347182cfd09b0e3eec6e50472c"},
-    {file = "opencv_python-4.10.0.82-cp37-abi3-win32.whl", hash = "sha256:ff54adc9e4daaf438e669664af08bec4a268c7b7356079338b8e4fae03810f2c"},
-    {file = "opencv_python-4.10.0.82-cp37-abi3-win_amd64.whl", hash = "sha256:2e3c2557b176f1e528417520a52c0600a92c1bb1c359f3df8e6411ab4293f065"},
 ]
 
 [[package]]
@@ -2631,24 +2591,6 @@ groups = ["default"]
 files = [
     {file = "traitlets-5.14.3-py3-none-any.whl", hash = "sha256:b74e89e397b1ed28cc831db7aea759ba6640cb3de13090ca145426688ff1ac4f"},
     {file = "traitlets-5.14.3.tar.gz", hash = "sha256:9ed0579d3502c94b4b3732ac120375cda96f923114522847de4b3bb98b96b6b7"},
-]
-
-[[package]]
-name = "transcoders-slim"
-version = "0.2.1"
-requires_python = ">=3.10"
-summary = "A template for python projects in PDM"
-groups = ["default"]
-dependencies = [
-    "einops>=0.6.0",
-    "huggingface-hub>=0.23.0",
-    "jaxtyping>=0.2.28",
-    "torch>=2.3.0",
-    "transformer-lens>=1.14.0",
-]
-files = [
-    {file = "transcoders_slim-0.2.1-py3-none-any.whl", hash = "sha256:549b92ea7ea6b8e73f649e6ee427b492b430aaafb30329e8cda9ffbb3ce27b94"},
-    {file = "transcoders_slim-0.2.1.tar.gz", hash = "sha256:15ef2b0329cafea52655418c63beee2d434a59c098f6033819d657a949536aeb"},
 ]
 
 [[package]]
