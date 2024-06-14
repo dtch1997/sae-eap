@@ -5,6 +5,7 @@ from jaxtyping import Float, Int
 from typing import Protocol, Callable, Literal, TypeGuard
 from transformer_lens.hook_points import HookPoint
 
+Device = Literal["cpu", "cuda", "mps"]
 HookName = str
 ModuleName = Literal["mlp", "attn", "metric", "mlp_error", "attn_error"]
 
