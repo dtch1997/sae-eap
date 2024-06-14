@@ -1,5 +1,8 @@
 from __future__ import annotations
 from dataclasses import dataclass
+from sae_eap.core.types import HookName
+
+NodeName = str
 
 
 @dataclass
@@ -14,10 +17,10 @@ class Node:
         out_hook: TransformerLens hook for the output.
     """
 
-    name: str
+    name: NodeName
     layer: int
-    in_hook: str | tuple[str, ...]
-    out_hook: str
+    in_hook: HookName | tuple[HookName, ...]
+    out_hook: HookName
 
     def __eq__(self, other):
         return self.name == other.name

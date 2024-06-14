@@ -11,6 +11,8 @@ dependencies = [
     "ipykernel>=6.29.4",
     "pygraphviz>=1.13",
     "cmapy>=0.6.6",
+    "tensordict>=0.4.0",
+    "networkx>=3.3",
 ]
 requires-python = ">=3.11"
 readme = "README.md"
