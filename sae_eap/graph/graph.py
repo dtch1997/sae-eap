@@ -15,9 +15,20 @@ class Graph:
     """
 
     cfg: HookedTransformerConfig
-    graph: nx.DiGraph
+    graph: nx.MultiDiGraph
 
-    """ Main APIs """
+    def __init__(
+        self,
+        cfg: HookedTransformerConfig = GPT_2_SMALL_MODEL_CONFIG,
+        graph: nx.MultiDiGraph | None = None,
+    ):
+        self.cfg = cfg
+        if graph is not None:
+            self.graph = graph
+        else:
+            self.graph = nx.MultiDiGraph()
+
+    """ Basic getter, setter, and utility functions """
 
     @property
     def nodes(self) -> Sequence[Node]:
@@ -27,23 +38,13 @@ class Graph:
     def edges(self) -> Sequence[Edge]:
         return list(self.graph.edges)
 
-    @property
-    def n_forward_nodes(self) -> int:
-        """The number of forward nodes in the graph."""
-        raise NotImplementedError
-
-    @property
-    def n_backward_nodes(self) -> int:
-        """The number of backward nodes in the graph."""
-        raise NotImplementedError
-
     def get_children(self, node: Node) -> set[Node]:
         """Get the children of a node."""
-        raise NotImplementedError
+        return set(self.graph.successors(node))
 
     def get_parents(self, node: Node) -> set[Node]:
         """Get the parents of a node."""
-        raise NotImplementedError
+        return set(self.graph.predecessors(node))
 
     def to_json(self) -> dict[str, Any]:
         """Convert the graph to a JSON object."""
@@ -54,22 +55,11 @@ class Graph:
         """Create a graph from a JSON object."""
         return Graph(nx.node_link_graph(data))
 
-    """ Helper functions """
-
-    def __init__(
-        self,
-        cfg: HookedTransformerConfig = GPT_2_SMALL_MODEL_CONFIG,
-        graph: nx.DiGraph | None = None,
-    ):
-        self.cfg = cfg
-        if graph is not None:
-            self.graph = graph
-        else:
-            self.graph = nx.DiGraph()
-
     def copy(self) -> "Graph":
         """Return a copy of the graph."""
         return Graph(self.graph.copy())  # type: ignore
+
+    """ Methods to manipulate the graph """
 
     def add_node(self, node: Node) -> None:
         """Add a node to the graph."""
@@ -77,34 +67,53 @@ class Graph:
 
     def add_edge(self, edge: Edge) -> None:
         """Add an edge to the graph."""
-        self.graph.add_edge(edge.parent, edge.child)
+        self.graph.add_edge(
+            u_for_edge=edge.parent,
+            v_for_edge=edge.child,
+            key=edge.type,
+        )
 
     def remove_node(self, node: Node) -> None:
         """Remove a node from the graph."""
-        # NOTE: This should do a few things:
-        # 1. Remove the node from the graph.
-        # 2. Remove all edges connected to the node.
-        # 3. Remove the node from its parents' children.
-        # 4. Remove the node from its children's parents.
-        raise NotImplementedError
+        self.graph.remove_node(node)
 
     def remove_edge(self, edge: Edge) -> None:
         """Remove an edge from the graph."""
-        # NOTE: This should do a few things:
-        # 1. Remove the edge from the graph.
-        # 2. Remove the child from the parent's children.
-        # 3. Remove the parent from the child's parents.
-        raise NotImplementedError
+        self.graph.remove_edge(edge.parent, edge.child, key=edge.type)
 
     def prune_dead_ends(self) -> None:
         """Prune dead-end nodes."""
         raise NotImplementedError
 
-    def get_edge_info(self, edge) -> dict[Any, Any]:
+    """ Methods to manipulate metadata """
+
+    def get_node_info(self, node: Node) -> dict[str, Any]:
+        """Get the node info."""
+        return self.graph.nodes[node]
+
+    def set_node_info(self, node: Node, info: dict[str, Any]) -> None:
+        """Set the node info."""
+        self.graph.nodes[node].update(info)
+
+    def get_edge_info(self, edge: Edge) -> dict[str, Any]:
         """Get the edge info."""
-        raise NotImplementedError
+        return self.graph.get_edge_data(edge.parent, edge.child, key=edge.type)  # type: ignore
+
+    def set_edge_info(self, edge: Edge, info: dict[str, Any]) -> None:
+        """Set the edge info."""
+        self.graph[edge.parent][edge.child][edge.type].update(info)
 
     """ Syntactic sugar functions """
+
+    @property
+    def n_forward_nodes(self) -> int:
+        """The number of nodes in the graph that have at least one child."""
+        raise NotImplementedError
+
+    @property
+    def n_backward_nodes(self) -> int:
+        """The number of nodes in the graph that have at least one parent."""
+        raise NotImplementedError
 
     def get_edge_score(self, edge) -> float:
         """Get the edge score."""
