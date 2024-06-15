@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 from typing import Any, Sequence
-from sae_eap.graph.node import Node
-from sae_eap.graph.edge import Edge
-from sae_eap.core.constants import GPT_2_SMALL_MODEL_CONFIG
-from transformer_lens import HookedTransformerConfig
 
 import networkx as nx
+from transformer_lens import HookedTransformerConfig
+
+from sae_eap.core.constants import GPT_2_SMALL_MODEL_CONFIG
+from sae_eap.graph.edge import Edge
+from sae_eap.graph.node import Node
 
 
 class Graph:
