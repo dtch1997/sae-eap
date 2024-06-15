@@ -99,6 +99,32 @@ class AttentionNode(Node):
         )
 
 
+class SAEReconstructionNode(Node):
+    def __init__(self, layer: int):
+        name = f"sae_recons{layer}"
+        index = slice(None)
+        super().__init__(
+            name,
+            layer,
+            f"blocks.{layer}.hook_resid_pre.hook_sae_input",
+            f"blocks.{layer}.hook_resid_pre.hook_sae_recons",
+            index,
+        )
+
+
+class SAEErrorNode(Node):
+    def __init__(self, layer: int):
+        name = f"sae_error{layer}"
+        index = slice(None)
+        super().__init__(
+            name,
+            layer,
+            f"blocks.{layer}.hook_resid_pre.hook_sae_input",
+            f"blocks.{layer}.hook_resid_pre.hook_sae_error",
+            index,
+        )
+
+
 class InputNode(Node):
     def __init__(self):
         name = "input"
@@ -174,6 +200,25 @@ class Graph:
         self.edges = {}
         self.n_forward = 0
         self.n_backward = 0
+
+    def get_nodes_by_layer(self, layers: int | list[int]):
+        if isinstance(layers, int):
+            layers = [layers]
+        return [node for node in self.nodes.values() if node.layer in layers]
+
+    def add_node(
+        self,
+        node: Node,
+    ):
+        assert node.name not in self.nodes, f"Node {node.name} already exists"
+        self.nodes[node.name] = node
+
+    def get_edge(
+        self,
+        parent: Node,
+        child: Node,
+    ):
+        pass
 
     def add_edge(
         self,
