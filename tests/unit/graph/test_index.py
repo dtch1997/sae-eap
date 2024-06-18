@@ -2,7 +2,7 @@ from sae_eap.graph.build import build_graph
 from sae_eap.graph.index import GraphIndexer
 
 
-def get_n_act_index_of_model_only_graph(cfg):
+def get_n_outputs_of_model_only_graph(cfg):
     """Get the number of activation indices in a graph without any SAEs.
 
     Formula:
@@ -14,7 +14,7 @@ def get_n_act_index_of_model_only_graph(cfg):
     return 1 + cfg.n_layers * (cfg.n_heads + 1)
 
 
-def get_n_grad_index_of_model_only_graph(cfg):
+def get_n_inputs_of_model_only_graph(cfg):
     """Get the number of gradient indices in a graph without any SAEs.
 
     Formula:
@@ -29,31 +29,28 @@ def get_n_grad_index_of_model_only_graph(cfg):
 def test_graph_indexer_basic(ts_model):
     graph = build_graph(ts_model)
     graph_indexer = GraphIndexer(graph)
-    assert graph_indexer.n_act_index == get_n_act_index_of_model_only_graph(graph.cfg)
-    assert graph_indexer.n_grad_index == get_n_grad_index_of_model_only_graph(graph.cfg)
+    assert graph_indexer.n_outputs == get_n_outputs_of_model_only_graph(graph.cfg)
+    assert graph_indexer.n_inputs == get_n_inputs_of_model_only_graph(graph.cfg)
 
     for node in graph.nodes:
-        act_index = graph_indexer.get_act_index(node)
-        grad_index = graph_indexer.get_grad_index(node)
-        assert len(act_index) == len(node.get_out_hooks())
-        assert len(grad_index) == len(node.get_in_hooks())
+        output_index = graph_indexer.get_output_index(node)
+        input_index = graph_indexer.get_input_index(node)
+        assert len(output_index) == len(node.get_out_hooks())
+        assert len(input_index) == len(node.get_in_hooks())
 
 
 def test_graph_index_does_not_repeat(ts_model):
     graph = build_graph(ts_model)
     graph_indexer = GraphIndexer(graph)
 
-    act_indices_seen = set()
-    grad_indices_seen = set()
+    output_indices_seen = set()
+    input_indices_seen = set()
 
     for node in graph.nodes:
-        act_index = graph_indexer.get_act_index(node)
-        grad_index = graph_indexer.get_grad_index(node)
+        for o in graph_indexer.get_output_index(node):
+            assert o not in output_indices_seen
+            output_indices_seen.add(o)
 
-        for a in act_index:
-            assert a not in act_indices_seen
-            act_indices_seen.add(act_index)
-
-        for g in grad_index:
-            assert g not in grad_indices_seen
-            grad_indices_seen.add(grad_index)
+        for g in graph_indexer.get_input_index(node):
+            assert g not in input_indices_seen
+            input_indices_seen.add(g)
