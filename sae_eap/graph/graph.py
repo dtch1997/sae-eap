@@ -112,16 +112,6 @@ class Graph:
 
     """ Syntactic sugar """
 
-    @property
-    def n_forward_nodes(self) -> int:
-        """The number of nodes in the graph that have at least one child."""
-        raise NotImplementedError
-
-    @property
-    def n_backward_nodes(self) -> int:
-        """The number of nodes in the graph that have at least one parent."""
-        raise NotImplementedError
-
     def get_edge_score(self, edge) -> float:
         """Get the edge score."""
         return self.get_edge_info(edge)["score"]
