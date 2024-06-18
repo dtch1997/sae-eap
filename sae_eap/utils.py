@@ -1,5 +1,6 @@
 import torch
 from sae_eap.core.types import Device
+from transformer_lens import HookedTransformer
 
 
 def get_device() -> Device:
@@ -14,3 +15,12 @@ def get_device() -> Device:
         return "cpu"
 
     raise RuntimeError("Should not reach here!")
+
+
+def get_npos_and_input_lengths(model: HookedTransformer, inputs: list[str]):
+    tokenized = model.tokenizer(
+        inputs, padding="longest", return_tensors="pt", add_special_tokens=True
+    )
+    n_pos = 1 + tokenized.attention_mask.size(1)
+    input_lengths = 1 + tokenized.attention_mask.sum(1)
+    return n_pos, input_lengths

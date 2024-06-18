@@ -24,11 +24,11 @@ MetricFn = Callable[[Model, Tokens], Metric]
 SaeFamily = Literal["res-jb", "att-kk", "tres-dc"]
 
 
-class TransformerLensForwardHook(Protocol):
+class TLForwardHook(Protocol):
     def __call__(self, orig: torch.Tensor, hook: HookPoint) -> torch.Tensor:
         raise NotImplementedError
 
 
-class TransformerLensBackwardHook(Protocol):
+class TLBackwardHook(Protocol):
     def __call__(self, orig: torch.Tensor, hook: HookPoint) -> tuple[torch.Tensor]:
         raise NotImplementedError
