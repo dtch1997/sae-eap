@@ -7,7 +7,7 @@ from transformer_lens import HookedTransformerConfig
 
 from sae_eap.core.constants import GPT_2_SMALL_MODEL_CONFIG
 from sae_eap.graph.edge import Edge, TensorEdge
-from sae_eap.graph.node import Node, TensorNode
+from sae_eap.graph.node import Node, TensorNode, SrcNode, DestNode
 
 TNode = TypeVar("TNode", bound=Node)
 TEdge = TypeVar("TEdge", bound=Edge)
@@ -136,6 +136,16 @@ class TensorGraph(Graph[TensorNode, TensorEdge]):
     ):
         super().__init__(graph=graph, node_cls=TensorNode, edge_cls=TensorEdge)
         self.cfg = cfg
+
+    @property
+    def src_nodes(self) -> Sequence[SrcNode]:
+        """Get the source nodes in the graph."""
+        return [node for node in self.nodes if node.is_src]
+
+    @property
+    def dest_nodes(self) -> Sequence[DestNode]:
+        """Get the destination nodes in the graph."""
+        return [node for node in self.nodes if node.is_dest]
 
     def to_json(self) -> dict[str, Any]:
         """Convert the graph to a JSON object."""

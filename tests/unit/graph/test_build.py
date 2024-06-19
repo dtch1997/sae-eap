@@ -3,6 +3,30 @@ from sae_eap.graph.graph import TensorGraph
 from tests.unit.helpers import load_model_cached, SOLU_1L_MODEL
 
 
+def get_n_src_nodes_of_model_only_graph(cfg):
+    """Get the number of activation indices in a graph without any SAEs.
+
+    Formula:
+    - InputNode: 1
+    - Attention Node: n_head x n_layers
+    - MLP Node: n_layers
+    - Logit Node: 0
+    """
+    return 1 + cfg.n_layers * (cfg.n_heads + 1)
+
+
+def get_n_dest_nodes_of_model_only_graph(cfg):
+    """Get the number of gradient indices in a graph without any SAEs.
+
+    Formula:
+    - InputNode: 0
+    - Attention Node: 3 x n_head x n_layers
+    - MLP Node: n_layers
+    - Logit Node: 1
+    """
+    return cfg.n_layers * (3 * cfg.n_heads + 1) + 1
+
+
 def test_build_graph_can_run():
     model = load_model_cached(SOLU_1L_MODEL)
     graph = build_graph(model)
@@ -25,6 +49,8 @@ def test_build_graph_has_correct_num_nodes():
     n_nodes = n_input_nodes + n_output_nodes + n_attn_nodes + n_mlp_nodes
 
     assert len(graph.nodes) == n_nodes
+    assert len(graph.src_nodes) == get_n_src_nodes_of_model_only_graph(model.cfg)
+    assert len(graph.dest_nodes) == get_n_dest_nodes_of_model_only_graph(model.cfg)
 
 
 def test_build_graph_has_correct_num_edges():
