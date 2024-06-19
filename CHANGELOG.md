@@ -1,6 +1,34 @@
 # CHANGELOG
 
+## v0.1.0 (2024-06-19)
 
+### Feature
+
+* feat: attribute (#2)
+
+* add unit tests for graph
+
+* minor
+
+* WIP: add notebook to do attribution
+
+* write test for graph indexing
+
+* working tests for indexer
+
+* refactor indexer: names, method names
+
+* implement attribution function
+
+* fix types
+
+---------
+
+Co-authored-by: Daniel Tan &lt;dtch1997@users.noreply.github.com&gt; ([`623412d`](https://github.com/dtch1997/sae-eap/commit/623412de7611302c4819ee7119a1d4131c271247))
+
+### Unknown
+
+* refactor to MultiDiGraph ([`8c479d3`](https://github.com/dtch1997/sae-eap/commit/8c479d36972fea1c3d9bc7701a4d2cdb94b488d0))
 
 ## v0.0.0 (2024-06-15)
 
