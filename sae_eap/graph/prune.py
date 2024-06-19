@@ -1,14 +1,14 @@
 """Pruning algorithms for the graph."""
 
 import abc
-from sae_eap.graph.graph import Graph
+from sae_eap.graph.graph import TensorGraph
 
 
 class Pruner(abc.ABC):
     """Base class for pruning algorithms."""
 
     @abc.abstractmethod
-    def apply(self, graph: Graph) -> Graph:
+    def apply(self, graph: TensorGraph) -> TensorGraph:
         raise NotImplementedError
 
 
@@ -19,7 +19,7 @@ class ThresholdPruner(Pruner):
         self.threshold = threshold
         self.absolute = absolute
 
-    def apply(self, graph: Graph) -> Graph:
+    def apply(self, graph: TensorGraph) -> TensorGraph:
         new_graph = graph.copy()
 
         # Remove edges with score below threshold
@@ -40,7 +40,7 @@ class TopNPruner(Pruner):
         self.n = n
         self.absolute = absolute
 
-    def apply(self, graph: Graph) -> Graph:
+    def apply(self, graph: TensorGraph) -> TensorGraph:
         new_graph = graph.copy()
         # TODO: implement
         raise NotImplementedError
@@ -69,7 +69,7 @@ class GreedyPruner(Pruner):
     def __init__(self, absolute: bool = True):
         self.absolute = absolute
 
-    def apply(self, graph: Graph) -> Graph:
+    def apply(self, graph: TensorGraph) -> TensorGraph:
         new_graph = graph.copy()
         # TODO: Implement
         raise NotImplementedError

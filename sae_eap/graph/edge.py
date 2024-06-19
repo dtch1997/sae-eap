@@ -9,7 +9,7 @@ EdgeName = str
 # # "na" corresponds to an edge that does not have an attention node as a child.
 
 
-@dataclass
+@dataclass(eq=True, frozen=True)
 class Edge:
     """Base class to represent an edge in a graph."""
 
@@ -21,16 +21,21 @@ class Edge:
         """The name of the edge."""
         return f"{self.parent.name}->{self.child.name}"
 
-    def __eq__(self, other):
-        return self.name == other.name
-
     def __repr__(self):
         return f"Edge({self.name})"
 
-    def __hash__(self):
-        return hash(self.name)
+    """ Syntactic sugar """
+
+    @property
+    def src(self) -> Node:
+        return self.parent
+
+    @property
+    def dest(self) -> Node:
+        return self.child
 
 
+@dataclass(eq=True, frozen=True)
 class TensorEdge(Edge):
     """An edge connecting two tensors in the model's computational graph."""
 

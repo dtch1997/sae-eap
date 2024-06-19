@@ -1,6 +1,6 @@
 from sae_eap.graph.build import build_graph
 from sae_eap.graph.graph import TensorGraph
-from tests.unit.helpers import load_model_cached, SOLU_1L_MODEL
+from tests.helpers import load_model_cached, SOLU_1L_MODEL
 
 
 def get_n_src_nodes_of_model_only_graph(cfg):

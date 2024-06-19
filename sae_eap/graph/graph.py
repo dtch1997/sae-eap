@@ -65,14 +65,14 @@ class Graph(Generic[TNode, TEdge]):
         return {"graph": graph_data}
 
     @classmethod
-    def from_json(cls, data: dict[str, Any]) -> Graph:
+    def from_json(cls, data: dict[str, Any]) -> TensorGraph:
         """Create a graph from a JSON object."""
         graph = nx.node_link_graph(data["graph"])
         return cls(graph=graph)
 
-    def copy(self) -> Graph:
+    def copy(self) -> TensorGraph:
         """Return a copy of the graph."""
-        return Graph(graph=self.graph.copy())  # type: ignore
+        return TensorGraph(graph=self.graph.copy())  # type: ignore
 
     """ Methods to manipulate the graph """
 
