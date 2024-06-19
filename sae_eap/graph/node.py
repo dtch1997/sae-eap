@@ -20,7 +20,7 @@ class Node:
     name: NodeName
     layer: int
     in_hook: HookName | tuple[HookName, ...]
-    out_hook: HookName
+    out_hook: HookName | tuple[HookName, ...]
 
     def __eq__(self, other):
         return self.name == other.name
@@ -30,6 +30,16 @@ class Node:
 
     def __hash__(self):
         return hash(self.name)
+
+    def get_in_hooks(self) -> tuple[HookName, ...]:
+        if isinstance(self.in_hook, tuple):
+            return self.in_hook
+        return (self.in_hook,)
+
+    def get_out_hooks(self) -> tuple[HookName, ...]:
+        if isinstance(self.out_hook, tuple):
+            return self.out_hook
+        return (self.out_hook,)
 
 
 class LogitNode(Node):
@@ -41,7 +51,7 @@ class LogitNode(Node):
             name=name,
             layer=n_layers - 1,
             in_hook=f"blocks.{n_layers - 1}.hook_resid_post",
-            out_hook="",
+            out_hook=(),
         )
 
 
@@ -85,7 +95,7 @@ class InputNode(Node):
         super().__init__(
             name=name,
             layer=0,
-            in_hook="",
+            in_hook=(),
             out_hook="hook_embed",
         )  # "blocks.0.hook_resid_pre", index)
 

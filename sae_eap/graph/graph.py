@@ -1,17 +1,20 @@
+from __future__ import annotations
+
 from typing import Any, Sequence
-from sae_eap.graph.node import Node
-from sae_eap.graph.edge import Edge
-from sae_eap.core.constants import GPT_2_SMALL_MODEL_CONFIG
-from transformer_lens import HookedTransformerConfig
 
 import networkx as nx
+from transformer_lens import HookedTransformerConfig
+
+from sae_eap.core.constants import GPT_2_SMALL_MODEL_CONFIG
+from sae_eap.graph.edge import Edge
+from sae_eap.graph.node import Node
 
 
 class Graph:
     """
     A class to represent a computational graph, which is a DAG.
 
-    Implemented as a wrapper around a networkx.DiGraph.
+    Implemented as a wrapper around a networkx.MultiDiGraph.
     """
 
     cfg: HookedTransformerConfig
@@ -48,16 +51,20 @@ class Graph:
 
     def to_json(self) -> dict[str, Any]:
         """Convert the graph to a JSON object."""
-        return nx.node_link_data(self.graph)  # type: ignore
+        cfg_data = self.cfg.to_dict()
+        graph_data = nx.node_link_data(self.graph)  # type: ignore
+        return {"cfg": cfg_data, "graph": graph_data}
 
     @staticmethod
-    def from_json(data: dict[str, Any]) -> "Graph":
+    def from_json(data: dict[str, Any]) -> Graph:
         """Create a graph from a JSON object."""
-        return Graph(nx.node_link_graph(data))
+        cfg = HookedTransformerConfig.from_dict(data["cfg"])
+        graph = nx.node_link_graph(data["graph"])
+        return Graph(cfg=cfg, graph=graph)
 
-    def copy(self) -> "Graph":
+    def copy(self) -> Graph:
         """Return a copy of the graph."""
-        return Graph(self.graph.copy())  # type: ignore
+        return Graph(cfg=self.cfg, graph=self.graph.copy())  # type: ignore
 
     """ Methods to manipulate the graph """
 
@@ -103,17 +110,7 @@ class Graph:
         """Set the edge info."""
         self.graph[edge.parent][edge.child][edge.type].update(info)
 
-    """ Syntactic sugar functions """
-
-    @property
-    def n_forward_nodes(self) -> int:
-        """The number of nodes in the graph that have at least one child."""
-        raise NotImplementedError
-
-    @property
-    def n_backward_nodes(self) -> int:
-        """The number of nodes in the graph that have at least one parent."""
-        raise NotImplementedError
+    """ Syntactic sugar """
 
     def get_edge_score(self, edge) -> float:
         """Get the edge score."""
