@@ -7,20 +7,9 @@ NodeName = str
 
 @dataclass
 class Node:
-    """
-    Base class to represent a node in the computational graph.
-
-    Attributes:
-        name: The name of the node.
-        layer: The layer of the node.
-        in_hooks: TransformerLens hook(s) for the input(s).
-        out_hook: TransformerLens hook for the output.
-    """
+    """Base class to represent a node in a graph."""
 
     name: NodeName
-    layer: int
-    in_hook: HookName | tuple[HookName, ...]
-    out_hook: HookName | tuple[HookName, ...]
 
     def __eq__(self, other):
         return self.name == other.name
@@ -31,96 +20,114 @@ class Node:
     def __hash__(self):
         return hash(self.name)
 
-    def get_in_hooks(self) -> tuple[HookName, ...]:
-        if isinstance(self.in_hook, tuple):
-            return self.in_hook
-        return (self.in_hook,)
 
-    def get_out_hooks(self) -> tuple[HookName, ...]:
-        if isinstance(self.out_hook, tuple):
-            return self.out_hook
-        return (self.out_hook,)
+class TensorNode(Node):
+    """A node corresponding to a tensor in the model's computational graph."""
 
+    hook: HookName
 
-class LogitNode(Node):
-    """A node corresponding to the output logits of the model."""
+    @property
+    def requires_grad(self) -> bool:
+        """Indicates whether we need to keep track of gradients at this hook."""
+        return False
 
-    def __init__(self, n_layers: int):
-        name = "logits"
-        super().__init__(
-            name=name,
-            layer=n_layers - 1,
-            in_hook=f"blocks.{n_layers - 1}.hook_resid_post",
-            out_hook=(),
-        )
+    @property
+    def requires_act(self) -> bool:
+        """Indicates whether we need to keep track of activations at this hook."""
+        return False
 
 
-class MLPNode(Node):
-    """A node corresponding to an MLP block in the model."""
-
-    def __init__(self, layer: int):
-        name = f"m{layer}"
-        super().__init__(
-            name=name,
-            layer=layer,
-            in_hook=f"blocks.{layer}.hook_mlp_in",
-            out_hook=f"blocks.{layer}.hook_mlp_out",
-        )
+class SrcNode(TensorNode):
+    @property
+    def requires_act(self) -> bool:
+        return True
 
 
-class AttentionNode(Node):
-    """A node corresponding to an attention head in the model.
-
-    NOTE: We have one node per head.
-    """
-
-    head: int
-
-    def __init__(self, layer: int, head: int):
-        name = f"a{layer}.h{head}"
-        self.head = head
-        super().__init__(
-            name=name,
-            layer=layer,
-            in_hook=tuple([f"blocks.{layer}.hook_{letter}_input" for letter in "qkv"]),
-            out_hook=f"blocks.{layer}.attn.hook_result",
-        )
+class DestNode(TensorNode):
+    @property
+    def requires_grad(self) -> bool:
+        return True
 
 
-class InputNode(Node):
-    """A node corresponding to the input of the model."""
+# class LogitNode(Node):
+#     """A node corresponding to the output logits of the model."""
 
-    def __init__(self):
-        name = "input"
-        super().__init__(
-            name=name,
-            layer=0,
-            in_hook=(),
-            out_hook="hook_embed",
-        )  # "blocks.0.hook_resid_pre", index)
-
-
-# SAE nodes.
-# NOTE: Currently hardcoded to resid_pre
+#     def __init__(self, n_layers: int):
+#         name = "logits"
+#         super().__init__(
+#             name=name,
+#             layer=n_layers - 1,
+#             in_hook=f"blocks.{n_layers - 1}.hook_resid_post",
+#             out_hook=(),
+#         )
 
 
-class SAEReconstructionNode(Node):
-    def __init__(self, layer: int):
-        name = f"sae_recons{layer}"
-        super().__init__(
-            name=name,
-            layer=layer,
-            in_hook=f"blocks.{layer}.hook_resid_pre.hook_sae_input",
-            out_hook=f"blocks.{layer}.hook_resid_pre.hook_sae_recons",
-        )
+# class MLPNode(Node):
+#     """A node corresponding to an MLP block in the model."""
+
+#     def __init__(self, layer: int):
+#         name = f"m{layer}"
+#         super().__init__(
+#             name=name,
+#             layer=layer,
+#             in_hook=f"blocks.{layer}.hook_mlp_in",
+#             out_hook=f"blocks.{layer}.hook_mlp_out",
+#         )
 
 
-class SAEErrorNode(Node):
-    def __init__(self, layer: int):
-        name = f"sae_error{layer}"
-        super().__init__(
-            name=name,
-            layer=layer,
-            in_hook=f"blocks.{layer}.hook_resid_pre.hook_sae_input",
-            out_hook=f"blocks.{layer}.hook_resid_pre.hook_sae_error",
-        )
+# class AttentionNode(Node):
+#     """A node corresponding to an attention head in the model.
+
+#     NOTE: We have one node per head.
+#     """
+
+#     head: int
+
+#     def __init__(self, layer: int, head: int):
+#         name = f"a{layer}.h{head}"
+#         self.head = head
+#         super().__init__(
+#             name=name,
+#             layer=layer,
+#             in_hook=tuple([f"blocks.{layer}.hook_{letter}_input" for letter in "qkv"]),
+#             out_hook=f"blocks.{layer}.attn.hook_result",
+#         )
+
+
+# class InputNode(Node):
+#     """A node corresponding to the input of the model."""
+
+#     def __init__(self):
+#         name = "input"
+#         super().__init__(
+#             name=name,
+#             layer=0,
+#             in_hook=(),
+#             out_hook="hook_embed",
+#         )  # "blocks.0.hook_resid_pre", index)
+
+
+# # SAE nodes.
+# # NOTE: Currently hardcoded to resid_pre
+
+
+# class SAEReconstructionNode(Node):
+#     def __init__(self, layer: int):
+#         name = f"sae_recons{layer}"
+#         super().__init__(
+#             name=name,
+#             layer=layer,
+#             in_hook=f"blocks.{layer}.hook_resid_pre.hook_sae_input",
+#             out_hook=f"blocks.{layer}.hook_resid_pre.hook_sae_recons",
+#         )
+
+
+# class SAEErrorNode(Node):
+#     def __init__(self, layer: int):
+#         name = f"sae_error{layer}"
+#         super().__init__(
+#             name=name,
+#             layer=layer,
+#             in_hook=f"blocks.{layer}.hook_resid_pre.hook_sae_input",
+#             out_hook=f"blocks.{layer}.hook_resid_pre.hook_sae_error",
+#         )
