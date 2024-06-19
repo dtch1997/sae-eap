@@ -18,9 +18,12 @@ def get_device() -> Device:
 
 
 def get_npos_and_input_lengths(model: HookedTransformer, inputs: list[str]):
+    assert model.tokenizer is not None
     tokenized = model.tokenizer(
         inputs, padding="longest", return_tensors="pt", add_special_tokens=True
     )
+    # assert tokenized is not None
+    # assert tokenized.attention_mask is not None
     n_pos = 1 + tokenized.attention_mask.size(1)
     input_lengths = 1 + tokenized.attention_mask.sum(1)
     return n_pos, input_lengths

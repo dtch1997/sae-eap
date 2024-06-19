@@ -1,3 +1,4 @@
+# type: ignore
 import torch
 
 from typing import Callable, Iterator

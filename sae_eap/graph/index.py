@@ -53,3 +53,12 @@ class GraphIndexer:
 
     def get_input_index(self, node: Node) -> Index:
         return self.node_input_index[node]
+
+    # def get_edge_index(self, edge: Edge) -> tuple[Index, Index]:
+    #     """ Get the output and input indices for an edge."""
+    #     src_node = edge.src_node
+    #     src_output_index = self.get_output_index(src_node)
+    #     dest_node = edge.dest_node
+    #     dest_input_index = self.get_input_index(dest_node)
+
+    #     # NOTE: The edge index will only go to one of the dest_node's input hooks...
