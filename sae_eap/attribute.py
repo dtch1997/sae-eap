@@ -1,15 +1,18 @@
 # type: ignore
+
 import torch
 
-from typing import Callable, Iterator
+
+from typing import Iterator, NamedTuple
 from jaxtyping import Float
 
 from tqdm import tqdm
 from einops import einsum
-from sae_eap.core.types import TLForwardHook, TLBackwardHook
-from sae_eap.utils import get_device, get_npos_and_input_lengths
-from sae_eap.graph import Graph
-from sae_eap.graph.index import GraphIndexer, Index
+from sae_eap.core.types import TLForwardHook, TLBackwardHook, HookName
+from sae_eap.utils import DeviceManager
+from sae_eap.graph import TensorGraph
+from sae_eap.graph.index import TensorGraphIndexer, TensorNodeIndex
+from sae_eap.data.handler import BatchHandler
 from transformer_lens import HookedTransformer, HookedTransformerConfig
 
 CacheTensor = Float[torch.Tensor, "batch pos n_node d_model"]
@@ -18,16 +21,16 @@ CacheTensor = Float[torch.Tensor, "batch pos n_node d_model"]
 # Define a hook function to store a tensor
 # When doing clean forward pass, we'll want to add activations to the tensor
 # When doing corrupted forward pass, we'll want to subtract activations from the tensor
-def get_cache_hook(cache: CacheTensor, index: Index, add: bool = True):
+def get_cache_hook(cache: CacheTensor, index: TensorNodeIndex, add: bool = True):
     """Factory function for TransformerLens hooks that cache a value."""
 
     def hook_fn(activations, hook):
-        acts = activations.detach()
+        acts: Float[torch.Tensor, "batch pos d_model"] = activations.detach()
         try:
             if add:
-                cache[index] += acts
+                cache[:, :, index] += acts
             else:
-                cache[index] -= acts
+                cache[:, :, index] -= acts
         except RuntimeError as e:
             # Some useful debugging information
             print(hook.name, cache.size(), acts.size())
@@ -38,10 +41,12 @@ def get_cache_hook(cache: CacheTensor, index: Index, add: bool = True):
 
 def init_cache_tensor(
     shape: tuple[int, ...],
-    device: str = get_device(),
+    device: str | None = None,
     dtype: torch.dtype = torch.float32,
 ):
     """Initialize a cache tensor."""
+    if device is None:
+        device = DeviceManager.instance().get_device()
     return torch.zeros(
         shape,
         device=device,
@@ -49,14 +54,29 @@ def init_cache_tensor(
     )
 
 
+CacheHooks = NamedTuple(
+    "CacheHooks",
+    [
+        ("fwd_hooks_clean", list[tuple[HookName, TLForwardHook]]),
+        ("fwd_hooks_corrupt", list[tuple[HookName, TLForwardHook]]),
+        ("bwd_hooks_clean", list[tuple[HookName, TLBackwardHook]]),
+    ],
+)
+
+CacheTensors = NamedTuple(
+    "CacheTensors",
+    [
+        ("act_cache", CacheTensor),
+        ("grad_cache", CacheTensor),
+    ],
+)
+
+
 def make_hooks_and_tensors(
-    graph: Graph,
+    graph: TensorGraph,
     batch_size: int = 1,
     n_token: int = 1,
-) -> tuple[
-    tuple[list[TLForwardHook], list[TLForwardHook], list[TLBackwardHook]],
-    tuple[CacheTensor, CacheTensor],
-]:
+) -> tuple[CacheHooks, CacheTensors]:
     """Make hooks and tensors to do attribution patching.
 
     Args:
@@ -79,133 +99,71 @@ def make_hooks_and_tensors(
     fwd_hooks_corrupt = []
     bwd_hooks_clean = []
 
-    indexer = GraphIndexer(graph)
+    indexer = TensorGraphIndexer(graph)
 
-    activation_delta_cache: Float[torch.Tensor, "batch pos n_output d_model"] = (
+    activation_delta_cache: Float[torch.Tensor, "batch pos n_src d_model"] = (
         init_cache_tensor(
-            shape=(batch_size, n_token, indexer.n_outputs, graph.cfg.d_model)
+            shape=(batch_size, n_token, len(graph.src_nodes), graph.cfg.d_model)
         )
     )
     gradient_cache: Float[torch.Tensor, "batch pos n_input d_model"] = (
         init_cache_tensor(
-            shape=(batch_size, n_token, indexer.n_inputs, graph.cfg.d_model)
+            shape=(batch_size, n_token, len(graph.dest_nodes), graph.cfg.d_model)
         )
     )
 
     # Populate the hooks and tensors.
-    for node in graph.nodes:
+    for node in graph.src_nodes:
         # Forward clean hook
-        index = indexer.get_output_index(node)
+        index = indexer.get_src_index(node)
         hook = get_cache_hook(activation_delta_cache, index, add=True)
-        fwd_hooks_clean.append(hook)
+        fwd_hooks_clean.append((node.hook, hook))
 
         # Forward corrupt hook
-        index = indexer.get_output_index(node)
+        index = indexer.get_src_index(node)
         hook = get_cache_hook(activation_delta_cache, index, add=False)
-        fwd_hooks_corrupt.append(hook)
+        fwd_hooks_corrupt.append((node.hook, hook))
 
+    for node in graph.dest_nodes:
         # Backward clean hook
-        index = indexer.get_input_index(node)
+        index = indexer.get_dest_index(node)
         hook = get_cache_hook(gradient_cache, index, add=True)
-        bwd_hooks_clean.append(hook)
+        bwd_hooks_clean.append((node.hook, hook))
 
-    hooks = (fwd_hooks_clean, fwd_hooks_corrupt, bwd_hooks_clean)
-    tensors = (activation_delta_cache, gradient_cache)
+    hooks = CacheHooks(fwd_hooks_clean, fwd_hooks_corrupt, bwd_hooks_clean)
+    tensors = CacheTensors(activation_delta_cache, gradient_cache)
     return hooks, tensors
 
 
 def compute_activations_and_gradients_simple(
     model: HookedTransformer,
-    graph: Graph,
-    clean_inputs: list[str],
-    corrupt_inputs: list[str],
-    metric: Callable[[torch.Tensor], torch.Tensor],
-    labels,
+    graph: TensorGraph,
+    handler: BatchHandler,
 ) -> tuple[torch.Tensor, torch.Tensor]:
     """Simple computation of activations."""
-    batch_size = len(clean_inputs)
-    n_pos, input_lengths = get_npos_and_input_lengths(model, clean_inputs)
 
+    # Make hooks and tensors
     (
         (fwd_hooks_clean, fwd_hooks_corrupt, bwd_hooks_clean),
         (activation_difference, gradients),
-    ) = make_hooks_and_tensors(graph, batch_size, n_pos)
+    ) = make_hooks_and_tensors(
+        graph, batch_size=handler.get_batch_size(), n_token=handler.get_n_pos()
+    )
 
     # Store the activations for the corrupt inputs
     with model.hooks(fwd_hooks=fwd_hooks_corrupt):
-        corrupted_logits = model(corrupt_inputs)
+        handler.get_logits(model, input="corrupt")
 
     # Store the activations and gradients for the clean inputs
     with model.hooks(fwd_hooks=fwd_hooks_clean, bwd_hooks=bwd_hooks_clean):
-        logits = model(clean_inputs)
-        metric_value = metric(logits, corrupted_logits, input_lengths, labels)
-        metric_value.backward()
+        logits = handler.get_logits(model, input="clean")
+        metric = handler.get_metric(logits)
+        metric.backward()
 
     return activation_difference, gradients
 
 
-def compute_activations_and_gradients_ig(
-    model: HookedTransformer,
-    graph: Graph,
-    clean_inputs: list[str],
-    corrupted_inputs: list[str],
-    metric: Callable[[torch.Tensor], torch.Tensor],
-    labels,
-    steps=30,
-):
-    """Compute the attribution using integrated gradients."""
-
-    raise NotImplementedError("This function is not implemented yet.")
-
-    batch_size = len(clean_inputs)
-    n_pos, input_lengths = get_npos_and_input_lengths(model, clean_inputs)
-
-    (
-        (fwd_hooks_corrupted, fwd_hooks_clean, bwd_hooks),
-        (activation_difference, gradients),
-    ) = make_hooks_and_tensors(graph, batch_size, n_pos)
-
-    with torch.inference_mode():
-        with model.hooks(fwd_hooks=fwd_hooks_corrupted):
-            _ = model(corrupted_inputs)
-
-        input_activations_corrupted = activation_difference[
-            :, :, graph.forward_index(graph.nodes["input"])
-        ].clone()
-
-        with model.hooks(fwd_hooks=fwd_hooks_clean):
-            clean_logits = model(clean_inputs)
-
-        input_activations_clean = (
-            input_activations_corrupted
-            - activation_difference[:, :, graph.forward_index(graph.nodes["input"])]
-        )
-
-    def input_interpolation_hook(k: int):
-        def hook_fn(activations, hook):
-            new_input = input_activations_corrupted + (k / steps) * (
-                input_activations_clean - input_activations_corrupted
-            )
-            new_input.requires_grad = True
-            return new_input
-
-        return hook_fn
-
-    total_steps = 0
-    for step in range(1, steps + 1):
-        total_steps += 1
-        with model.hooks(
-            fwd_hooks=[(graph.nodes["input"].out_hook, input_interpolation_hook(step))],
-            bwd_hooks=bwd_hooks,
-        ):
-            logits = model(clean_inputs)
-            metric_value = metric(logits, clean_logits, input_lengths, labels)
-            metric_value.backward()
-
-    gradients = gradients / total_steps
-
-    return activation_difference, gradients
-
+# TODO: integrated gradients
 
 allowed_aggregations = {"sum", "mean", "l2"}
 
@@ -239,35 +197,40 @@ def compute_attribution_scores(
 
 def attribute(
     model: HookedTransformer,
-    graph: Graph,
-    dataloader: Iterator[tuple[list[str], list[str], torch.Tensor]],
-    metric: Callable[[torch.Tensor], torch.Tensor],
+    graph: TensorGraph,
+    iter_batch_handler: Iterator[BatchHandler] | BatchHandler,
     *,
     aggregation="sum",
     quiet=False,
 ):
+    if isinstance(iter_batch_handler, BatchHandler):
+        iter_batch_handler = iter([iter_batch_handler])
+
     # Initialize the cache tensor
-    indexer = GraphIndexer(graph)
-    scores_cache = init_cache_tensor(shape=(indexer.n_outputs, indexer.n_inputs))
+    indexer = TensorGraphIndexer(graph)
+    scores_cache = init_cache_tensor(
+        shape=(len(graph.src_nodes), len(graph.dest_nodes))
+    )
 
     # Compute the attribution scores
     total_items = 0
-    dataloader = tqdm(dataloader, disable=quiet)
-    for clean, corrupted, label in dataloader:
-        batch_size = len(clean)
-        total_items += batch_size
+    iter_batch_handler = tqdm(iter_batch_handler, disable=quiet)
+    for handler in iter_batch_handler:
+        total_items += handler.get_batch_size()
+        # TODO: Add strategy for integrated gradients.
         activation_differences, gradients = compute_activations_and_gradients_simple(
-            model, graph, clean, corrupted, metric, label
+            model, graph, handler
         )
         scores = compute_attribution_scores(
             activation_differences, gradients, model.cfg, aggregation=aggregation
         )
-        scores_cache += scores
+    scores_cache += scores
     scores_cache /= total_items
     scores_cache = scores_cache.cpu().numpy()
 
     # Update the scores in the graph
     for edge in tqdm(graph.edges, total=len(graph.edges), disable=quiet):
-        # TODO: get the score
-        score = 0
+        score = scores_cache[
+            indexer.get_src_index(edge.src), indexer.get_dest_index(edge.dest)
+        ]
         graph.set_edge_info(edge, {"score": score})

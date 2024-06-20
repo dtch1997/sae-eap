@@ -1,9 +1,32 @@
 import torch
+from contextlib import contextmanager
+from sae_eap.core.patterns import Singleton
 from sae_eap.core.types import Device
 from transformer_lens import HookedTransformer
 
 
-def get_device() -> Device:
+@Singleton
+class DeviceManager:
+    device: Device
+
+    def __init__(self):
+        self.device = get_default_device()
+
+    def get_device(self) -> Device:
+        return self.device
+
+    def set_device(self, device: Device) -> None:
+        self.device = device
+
+    @contextmanager
+    def use_device(self, device: Device):
+        old_device = self.device
+        self.device = device
+        yield
+        self.device = old_device
+
+
+def get_default_device() -> Device:
     if torch.cuda.is_available():
         return "cuda"
     elif torch.backends.mps.is_available() and torch.backends.mps.is_built():

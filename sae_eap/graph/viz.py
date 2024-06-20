@@ -1,3 +1,5 @@
+# type: ignore
+# NOTE: Stale, needs to be updated after refactor.
 """Utilities to visualize a graph."""
 
 import numpy as np
@@ -6,7 +8,7 @@ import matplotlib
 import matplotlib.cm
 
 from sae_eap.graph.edge import Edge
-from sae_eap.graph.graph import Graph
+from sae_eap.graph.graph import TensorGraph
 
 
 EDGE_TYPE_COLORS = {
@@ -95,7 +97,7 @@ def get_color(edge: Edge):
 
 
 def to_graphviz(
-    graph: Graph,
+    graph: TensorGraph,
     colorscheme: str = "Pastel2",
     minimum_penwidth: float = 0.6,
     maximum_penwidth: float = 5.0,
