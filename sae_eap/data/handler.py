@@ -31,7 +31,7 @@ class BatchHandler(abc.ABC):
         pass
 
 
-def logits_to_ave_logit_diff(
+def logits_to_logit_diff(
     logits: Float[Tensor, "batch seq d_vocab"],
     correct_answer_tokens: Float[Tensor, " batch"],
     wrong_answer_tokens: Float[Tensor, " batch"],
@@ -45,8 +45,8 @@ def logits_to_ave_logit_diff(
         last_token_logits, wrong_answer_tokens, "batch [batch]"
     )
 
-    logits: Float[Tensor, " batch"] = correct_logits - incorrect_logits
-    return logits
+    logit_diff: Float[Tensor, " batch"] = correct_logits - incorrect_logits
+    return logit_diff
 
 
 class SinglePromptHandler(BatchHandler):
@@ -91,7 +91,7 @@ class SinglePromptHandler(BatchHandler):
             return model(self.corrupt_tokens)
 
     def get_metric(self, logits: Logits) -> Metric:
-        return logits_to_ave_logit_diff(
+        return logits_to_logit_diff(
             logits, self.answer_tokens, self.wrong_answer_tokens
         )
 

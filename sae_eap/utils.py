@@ -7,6 +7,8 @@ from transformer_lens import HookedTransformer
 
 @Singleton
 class DeviceManager:
+    device: Device
+
     def __init__(self):
         self.device = get_default_device()
 

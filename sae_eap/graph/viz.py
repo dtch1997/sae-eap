@@ -1,3 +1,5 @@
+# type: ignore
+# NOTE: Stale, needs to be updated after refactor.
 """Utilities to visualize a graph."""
 
 import numpy as np

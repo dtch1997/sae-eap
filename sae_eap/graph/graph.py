@@ -65,14 +65,14 @@ class Graph(Generic[TNode, TEdge]):
         return {"graph": graph_data}
 
     @classmethod
-    def from_json(cls, data: dict[str, Any]) -> TensorGraph:
+    def from_json(cls, data: dict[str, Any]) -> Graph:
         """Create a graph from a JSON object."""
         graph = nx.node_link_graph(data["graph"])
         return cls(graph=graph)
 
-    def copy(self) -> TensorGraph:
+    def copy(self) -> Graph:
         """Return a copy of the graph."""
-        return TensorGraph(graph=self.graph.copy())  # type: ignore
+        return Graph(graph=self.graph.copy())  # type: ignore
 
     """ Methods to manipulate the graph """
 
@@ -93,7 +93,7 @@ class Graph(Generic[TNode, TEdge]):
 
     def remove_edge(self, edge: TEdge) -> None:
         """Remove an edge from the graph."""
-        self.graph.remove_edge(edge.parent, edge.child, key=edge.type)
+        self.graph.remove_edge(edge.parent, edge.child)
 
     """ Methods to manipulate metadata """
 
@@ -107,7 +107,7 @@ class Graph(Generic[TNode, TEdge]):
 
     def get_edge_info(self, edge: TEdge) -> dict[str, Any]:
         """Get the edge info."""
-        return self.graph.get_edge_data(edge.parent, edge.child)
+        return self.graph.get_edge_data(edge.parent, edge.child)  # type: ignore
 
     def set_edge_info(self, edge: TEdge, info: dict[str, Any]) -> None:
         """Set the edge info."""
@@ -140,12 +140,12 @@ class TensorGraph(Graph[TensorNode, TensorEdge]):
     @property
     def src_nodes(self) -> Sequence[SrcNode]:
         """Get the source nodes in the graph."""
-        return [node for node in self.nodes if node.is_src]
+        return [node for node in self.nodes if node.is_src]  # type: ignore
 
     @property
     def dest_nodes(self) -> Sequence[DestNode]:
         """Get the destination nodes in the graph."""
-        return [node for node in self.nodes if node.is_dest]
+        return [node for node in self.nodes if node.is_dest]  # type: ignore
 
     def to_json(self) -> dict[str, Any]:
         """Convert the graph to a JSON object."""
@@ -153,12 +153,12 @@ class TensorGraph(Graph[TensorNode, TensorEdge]):
         graph_data = nx.node_link_data(self.graph)  # type: ignore
         return {"cfg": cfg_data, "graph": graph_data}
 
-    @staticmethod
-    def from_json(data: dict[str, Any]) -> TensorGraph:
+    @classmethod
+    def from_json(cls, data: dict[str, Any]) -> TensorGraph:
         """Create a graph from a JSON object."""
         cfg = HookedTransformerConfig.from_dict(data["cfg"])
         graph = nx.node_link_graph(data["graph"])
-        return TensorGraph(cfg=cfg, graph=graph)
+        return cls(cfg=cfg, graph=graph)
 
     def copy(self) -> TensorGraph:
         """Return a copy of the graph."""

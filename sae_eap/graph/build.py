@@ -1,7 +1,7 @@
 from typing import Sequence
 
 from sae_eap.graph.graph import TensorGraph
-from sae_eap.graph.node import SrcNode, DestNode, TensorNode
+from sae_eap.graph.node import SrcNode, DestNode
 from sae_eap.graph.edge import TensorEdge
 
 from transformer_lens import HookedTransformer, HookedTransformerConfig
@@ -72,20 +72,20 @@ def get_attn_nodes(
 def add_layer_nodes_and_edges(
     graph: TensorGraph,
     layer: int,
-    prev_src_nodes: Sequence[TensorNode],
-) -> Sequence[TensorNode]:
+    prev_src_nodes: list[SrcNode],
+) -> list[SrcNode]:
     """Add nodes and edges for a single layer."""
 
     # Add the nodes
     attn_src_nodes, attn_dest_nodes = get_attn_nodes(layer, graph.cfg.n_heads)
     mlp_src_node, mlp_dest_node = get_mlp_nodes(layer)
-    all_layer_nodes = attn_src_nodes + attn_dest_nodes + [mlp_src_node, mlp_dest_node]
+    all_layer_nodes = attn_src_nodes + attn_dest_nodes + [mlp_src_node, mlp_dest_node]  # type: ignore
     for node in all_layer_nodes:
         graph.add_node(node)
 
     # Add the edges
     for src_node in prev_src_nodes:
-        for dest_node in attn_dest_nodes + [mlp_dest_node]:
+        for dest_node in attn_dest_nodes + [mlp_dest_node]:  # type: ignore
             assert src_node.is_src
             assert dest_node.is_dest
             graph.add_edge(
@@ -131,7 +131,7 @@ def build_graph(
     graph.add_node(input_node)
 
     # Add the intermediate nodes
-    prev_src_nodes: list[TensorNode] = [input_node]
+    prev_src_nodes: list[SrcNode] = [input_node]
     for layer in range(graph.cfg.n_layers):
         prev_src_nodes = add_layer_nodes_and_edges(graph, layer, prev_src_nodes)
 

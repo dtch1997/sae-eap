@@ -1,3 +1,4 @@
+# type: ignore
 from typing import Sequence
 from sae_eap.graph.graph import TensorGraph
 from sae_eap.graph.node import TensorNode, SrcNode, DestNode

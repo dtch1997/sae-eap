@@ -1,3 +1,5 @@
+# type: ignore
+
 import torch
 
 
@@ -6,7 +8,7 @@ from jaxtyping import Float
 
 from tqdm import tqdm
 from einops import einsum
-from sae_eap.core.types import TLForwardHook, TLBackwardHook
+from sae_eap.core.types import TLForwardHook, TLBackwardHook, HookName
 from sae_eap.utils import DeviceManager
 from sae_eap.graph import TensorGraph
 from sae_eap.graph.index import TensorGraphIndexer, TensorNodeIndex
@@ -55,9 +57,9 @@ def init_cache_tensor(
 CacheHooks = NamedTuple(
     "CacheHooks",
     [
-        ("fwd_hooks_clean", list[TLForwardHook]),
-        ("fwd_hooks_corrupt", list[TLForwardHook]),
-        ("bwd_hooks_clean", list[TLBackwardHook]),
+        ("fwd_hooks_clean", list[tuple[HookName, TLForwardHook]]),
+        ("fwd_hooks_corrupt", list[tuple[HookName, TLForwardHook]]),
+        ("bwd_hooks_clean", list[tuple[HookName, TLBackwardHook]]),
     ],
 )
 
@@ -215,6 +217,7 @@ def attribute(
     iter_batch_handler = tqdm(iter_batch_handler, disable=quiet)
     for handler in iter_batch_handler:
         total_items += handler.get_batch_size()
+        # TODO: Add strategy for integrated gradients.
         activation_differences, gradients = compute_activations_and_gradients_simple(
             model, graph, handler
         )
@@ -227,7 +230,6 @@ def attribute(
 
     # Update the scores in the graph
     for edge in tqdm(graph.edges, total=len(graph.edges), disable=quiet):
-        # TODO: get the score
         score = scores_cache[
             indexer.get_src_index(edge.src), indexer.get_dest_index(edge.dest)
         ]
