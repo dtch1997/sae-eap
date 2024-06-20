@@ -1,13 +1,13 @@
 import torch
 
 
-from typing import Iterator
+from typing import Iterator, NamedTuple
 from jaxtyping import Float
 
 from tqdm import tqdm
 from einops import einsum
 from sae_eap.core.types import TLForwardHook, TLBackwardHook
-from sae_eap.utils import get_device
+from sae_eap.utils import DeviceManager
 from sae_eap.graph import TensorGraph
 from sae_eap.graph.index import TensorGraphIndexer, TensorNodeIndex
 from sae_eap.data.handler import BatchHandler
@@ -23,12 +23,12 @@ def get_cache_hook(cache: CacheTensor, index: TensorNodeIndex, add: bool = True)
     """Factory function for TransformerLens hooks that cache a value."""
 
     def hook_fn(activations, hook):
-        acts = activations.detach()
+        acts: Float[torch.Tensor, "batch pos d_model"] = activations.detach()
         try:
             if add:
-                cache[index] += acts
+                cache[:, :, index] += acts
             else:
-                cache[index] -= acts
+                cache[:, :, index] -= acts
         except RuntimeError as e:
             # Some useful debugging information
             print(hook.name, cache.size(), acts.size())
@@ -39,10 +39,12 @@ def get_cache_hook(cache: CacheTensor, index: TensorNodeIndex, add: bool = True)
 
 def init_cache_tensor(
     shape: tuple[int, ...],
-    device: str = get_device(),
+    device: str | None = None,
     dtype: torch.dtype = torch.float32,
 ):
     """Initialize a cache tensor."""
+    if device is None:
+        device = DeviceManager.instance().get_device()
     return torch.zeros(
         shape,
         device=device,
@@ -50,14 +52,29 @@ def init_cache_tensor(
     )
 
 
+CacheHooks = NamedTuple(
+    "CacheHooks",
+    [
+        ("fwd_hooks_clean", list[TLForwardHook]),
+        ("fwd_hooks_corrupt", list[TLForwardHook]),
+        ("bwd_hooks_clean", list[TLBackwardHook]),
+    ],
+)
+
+CacheTensors = NamedTuple(
+    "CacheTensors",
+    [
+        ("act_cache", CacheTensor),
+        ("grad_cache", CacheTensor),
+    ],
+)
+
+
 def make_hooks_and_tensors(
     graph: TensorGraph,
     batch_size: int = 1,
     n_token: int = 1,
-) -> tuple[
-    tuple[list[TLForwardHook], list[TLForwardHook], list[TLBackwardHook]],
-    tuple[CacheTensor, CacheTensor],
-]:
+) -> tuple[CacheHooks, CacheTensors]:
     """Make hooks and tensors to do attribution patching.
 
     Args:
@@ -111,8 +128,8 @@ def make_hooks_and_tensors(
         hook = get_cache_hook(gradient_cache, index, add=True)
         bwd_hooks_clean.append((node.hook, hook))
 
-    hooks = (fwd_hooks_clean, fwd_hooks_corrupt, bwd_hooks_clean)
-    tensors = (activation_delta_cache, gradient_cache)
+    hooks = CacheHooks(fwd_hooks_clean, fwd_hooks_corrupt, bwd_hooks_clean)
+    tensors = CacheTensors(activation_delta_cache, gradient_cache)
     return hooks, tensors
 
 
@@ -122,14 +139,14 @@ def compute_activations_and_gradients_simple(
     handler: BatchHandler,
 ) -> tuple[torch.Tensor, torch.Tensor]:
     """Simple computation of activations."""
-    batch_size = handler.get_batch_size()
-    n_pos = handler.get_n_pos()
 
     # Make hooks and tensors
     (
         (fwd_hooks_clean, fwd_hooks_corrupt, bwd_hooks_clean),
         (activation_difference, gradients),
-    ) = make_hooks_and_tensors(graph, batch_size, n_pos)
+    ) = make_hooks_and_tensors(
+        graph, batch_size=handler.get_batch_size(), n_token=handler.get_n_pos()
+    )
 
     # Store the activations for the corrupt inputs
     with model.hooks(fwd_hooks=fwd_hooks_corrupt):
