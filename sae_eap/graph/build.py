@@ -1,7 +1,7 @@
 from typing import Sequence
 
 from sae_eap.graph.graph import TensorGraph
-from sae_eap.graph.node import SrcNode, DestNode
+from sae_eap.graph.node import SrcNode, DestNode, AttentionSrcNode, AttentionDestNode
 from sae_eap.graph.edge import TensorEdge
 
 from transformer_lens import HookedTransformer, HookedTransformerConfig
@@ -52,13 +52,13 @@ def get_attn_nodes(
     in_hooks = tuple([f"blocks.{layer}.hook_{letter}_input" for letter in letters])
     out_hook = f"blocks.{layer}.attn.hook_result"
     src_nodes = [
-        SrcNode(
+        AttentionSrcNode(
             name=f"ATT.L{layer}.H{head_index}.out", hook=out_hook, head_index=head_index
         )
         for head_index in range(n_heads)
     ]
     dest_nodes = [
-        DestNode(
+        AttentionDestNode(
             name=f"ATT.L{layer}.H{head_index}.in_{letter}",
             hook=in_hook,
             head_index=head_index,

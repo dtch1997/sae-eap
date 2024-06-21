@@ -11,32 +11,40 @@ from einops import einsum
 from sae_eap.core.types import TLForwardHook, TLBackwardHook, HookName
 from sae_eap.utils import DeviceManager
 from sae_eap.graph import TensorGraph
+from sae_eap.graph.node import SrcNode, DestNode
 from sae_eap.graph.index import TensorGraphIndexer, TensorNodeIndex
 from sae_eap.data.handler import BatchHandler
 from transformer_lens import HookedTransformer, HookedTransformerConfig
 
-CacheTensor = Float[torch.Tensor, "batch pos n_node d_model"]
+# NOTE: variadic type annotation
+# There can be arbitrarily many dimensiosn after the first two
+CacheTensor = Float[torch.Tensor, "batch pos * d_model"]
 
 
-# Define a hook function to store a tensor
-# When doing clean forward pass, we'll want to add activations to the tensor
-# When doing corrupted forward pass, we'll want to subtract activations from the tensor
-def get_cache_hook(cache: CacheTensor, index: TensorNodeIndex, add: bool = True):
-    """Factory function for TransformerLens hooks that cache a value."""
+class CacheDict(dict):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
 
-    def hook_fn(activations, hook):
-        acts: Float[torch.Tensor, "batch pos d_model"] = activations.detach()
-        try:
-            if add:
-                cache[:, :, index] += acts
-            else:
-                cache[:, :, index] -= acts
-        except RuntimeError as e:
-            # Some useful debugging information
-            print(hook.name, cache.size(), acts.size())
-            raise e
+    def __getitem__(self, key: HookName) -> CacheTensor:
+        return super().__getitem__(key)
 
-    return hook_fn
+    def __setitem__(self, key: HookName, value: CacheTensor):
+        super().__setitem__(key, value)
+
+    def __repr__(self):
+        return f"CacheDict({super().__repr__()})"
+
+    @property
+    def batch_size(self) -> int:
+        return next(iter(self.values())).size(0)
+
+    @property
+    def n_pos(self) -> int:
+        return next(iter(self.values())).size(1)
+
+    @property
+    def d_model(self) -> int:
+        return next(iter(self.values())).size(-1)
 
 
 def init_cache_tensor(
@@ -54,6 +62,29 @@ def init_cache_tensor(
     )
 
 
+# Define a hook function to store a tensor
+# When doing clean forward pass, we'll want to add activations to the tensor
+# When doing corrupted forward pass, we'll want to subtract activations from the tensor
+def get_cache_hook(cache: CacheDict, add: bool = True):
+    """Factory function for TransformerLens hooks that cache a value."""
+
+    def hook_fn(activations, hook):
+        acts: CacheTensor = activations.detach()
+        if hook.name not in cache:
+            cache[hook.name] = init_cache_tensor(acts.size(), dtype=acts.dtype)
+        try:
+            if add:
+                cache[hook.name] += acts
+            else:
+                cache[hook.name] -= acts
+        except RuntimeError as e:
+            # Some useful debugging information
+            print(hook.name, cache.size(), acts.size())
+            raise e
+
+    return hook_fn
+
+
 CacheHooks = NamedTuple(
     "CacheHooks",
     [
@@ -63,20 +94,20 @@ CacheHooks = NamedTuple(
     ],
 )
 
-CacheTensors = NamedTuple(
-    "CacheTensors",
+CacheDicts = NamedTuple(
+    "CacheDicts",
     [
-        ("act_cache", CacheTensor),
-        ("grad_cache", CacheTensor),
+        ("act_cache", CacheDict),
+        ("grad_cache", CacheDict),
     ],
 )
 
 
-def make_hooks_and_tensors(
+def make_cache_hooks_and_tensors(
     graph: TensorGraph,
     batch_size: int = 1,
     n_token: int = 1,
-) -> tuple[CacheHooks, CacheTensors]:
+) -> tuple[CacheHooks, CacheDicts]:
     """Make hooks and tensors to do attribution patching.
 
     Args:
@@ -99,68 +130,90 @@ def make_hooks_and_tensors(
     fwd_hooks_corrupt = []
     bwd_hooks_clean = []
 
-    indexer = TensorGraphIndexer(graph)
-
-    activation_delta_cache: Float[torch.Tensor, "batch pos n_src d_model"] = (
-        init_cache_tensor(
-            shape=(batch_size, n_token, len(graph.src_nodes), graph.cfg.d_model)
-        )
-    )
-    gradient_cache: Float[torch.Tensor, "batch pos n_input d_model"] = (
-        init_cache_tensor(
-            shape=(batch_size, n_token, len(graph.dest_nodes), graph.cfg.d_model)
-        )
-    )
+    activation_delta_cache = CacheDict()
+    gradient_cache = CacheDict()
 
     # Populate the hooks and tensors.
     for node in graph.src_nodes:
         # Forward clean hook
-        index = indexer.get_src_index(node)
-        hook = get_cache_hook(activation_delta_cache, index, add=True)
+        hook = get_cache_hook(activation_delta_cache, add=True)
         fwd_hooks_clean.append((node.hook, hook))
 
         # Forward corrupt hook
-        index = indexer.get_src_index(node)
-        hook = get_cache_hook(activation_delta_cache, index, add=False)
+        hook = get_cache_hook(activation_delta_cache, add=False)
         fwd_hooks_corrupt.append((node.hook, hook))
 
     for node in graph.dest_nodes:
         # Backward clean hook
-        index = indexer.get_dest_index(node)
-        hook = get_cache_hook(gradient_cache, index, add=True)
+        hook = get_cache_hook(gradient_cache, add=True)
         bwd_hooks_clean.append((node.hook, hook))
 
     hooks = CacheHooks(fwd_hooks_clean, fwd_hooks_corrupt, bwd_hooks_clean)
-    tensors = CacheTensors(activation_delta_cache, gradient_cache)
-    return hooks, tensors
+    caches = CacheDicts(activation_delta_cache, gradient_cache)
+    return hooks, caches
 
 
-def compute_activations_and_gradients_simple(
+def get_model_caches(
     model: HookedTransformer,
     graph: TensorGraph,
     handler: BatchHandler,
-) -> tuple[torch.Tensor, torch.Tensor]:
+) -> CacheDicts:
     """Simple computation of activations."""
 
     # Make hooks and tensors
-    (
-        (fwd_hooks_clean, fwd_hooks_corrupt, bwd_hooks_clean),
-        (activation_difference, gradients),
-    ) = make_hooks_and_tensors(
+    hooks, caches = make_cache_hooks_and_tensors(
         graph, batch_size=handler.get_batch_size(), n_token=handler.get_n_pos()
     )
 
     # Store the activations for the corrupt inputs
-    with model.hooks(fwd_hooks=fwd_hooks_corrupt):
+    with model.hooks(fwd_hooks=hooks.fwd_hooks_corrupt):
         handler.get_logits(model, input="corrupt")
 
     # Store the activations and gradients for the clean inputs
-    with model.hooks(fwd_hooks=fwd_hooks_clean, bwd_hooks=bwd_hooks_clean):
+    with model.hooks(fwd_hooks=hooks.fwd_hooks_clean, bwd_hooks=hooks.bwd_hooks_clean):
         logits = handler.get_logits(model, input="clean")
         metric = handler.get_metric(logits)
         metric.backward()
 
-    return activation_difference, gradients
+    return caches
+
+
+def compute_node_act_cache(
+    node_index: dict[SrcNode, TensorNodeIndex],
+    model_act_cache: CacheDict,
+) -> CacheTensor:
+    node_act_cache = init_cache_tensor(
+        shape=(
+            model_act_cache.batch_size,
+            model_act_cache.n_pos,
+            len(node_index),
+            model_act_cache.d_model,
+        )
+    )
+    for node, index in node_index.items():
+        model_act = model_act_cache[node.hook]
+        node_act = node.get_act(model_act)
+        assert len(node_act.shape) == 3
+        node_act_cache[:, :, index, :] = node_act
+    return node_act_cache
+
+
+def compute_node_grad_cache(
+    node_index: dict[DestNode, TensorNodeIndex],
+    model_grad_cache: CacheDict,
+) -> CacheTensor:
+    node_grad_cache = init_cache_tensor(
+        shape=(
+            model_grad_cache.batch_size,
+            model_grad_cache.n_pos,
+            len(node_index),
+            model_grad_cache.d_model,
+        )
+    )
+    for node, index in node_index.items():
+        model_grad = model_grad_cache[node.hook]
+        node_grad_cache[:, :, index] = node.get_grad(model_grad)
+    return node_grad_cache
 
 
 # TODO: integrated gradients
@@ -218,11 +271,16 @@ def attribute(
     for handler in iter_batch_handler:
         total_items += handler.get_batch_size()
         # TODO: Add strategy for integrated gradients.
-        activation_differences, gradients = compute_activations_and_gradients_simple(
-            model, graph, handler
+        model_caches = get_model_caches(model, graph, handler)
+        node_act_cache = compute_node_act_cache(
+            indexer.src_index, model_caches.act_cache
         )
+        node_grad_cache = compute_node_grad_cache(
+            indexer.dest_index, model_caches.grad_cache
+        )
+
         scores = compute_attribution_scores(
-            activation_differences, gradients, model.cfg, aggregation=aggregation
+            node_act_cache, node_grad_cache, model.cfg, aggregation=aggregation
         )
     scores_cache += scores
     scores_cache /= total_items

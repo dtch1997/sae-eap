@@ -20,10 +20,10 @@ class DeviceManager:
 
     @contextmanager
     def use_device(self, device: Device):
-        old_device = self.device
-        self.device = device
+        old_device = self.get_device()
+        self.set_device(device)
         yield
-        self.device = old_device
+        self.set_device(old_device)
 
 
 def get_default_device() -> Device:

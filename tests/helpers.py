@@ -1,6 +1,10 @@
 import copy
 
 from transformer_lens import HookedTransformer
+from sae_eap.utils import DeviceManager
+from sae_eap.model.load_pretrained import load_model
+
+DeviceManager.instance().use_device("cpu")
 
 SOLU_1L_MODEL = "solu-1l"
 TINYSTORIES_MODEL = "tiny-stories-1M"
@@ -16,8 +20,6 @@ def load_model_cached(model_name: str) -> HookedTransformer:
     NOTE: if the model gets modified in tests this will not work.
     """
     if model_name not in MODEL_CACHE:
-        MODEL_CACHE[model_name] = HookedTransformer.from_pretrained(
-            model_name, device="cpu"
-        )
+        MODEL_CACHE[model_name] = load_model(model_name)
     # we copy here to prevent sharing state across tests
     return copy.deepcopy(MODEL_CACHE[model_name])

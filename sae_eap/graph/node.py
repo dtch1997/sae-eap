@@ -1,6 +1,10 @@
 from __future__ import annotations
+
+import torch
+
 from dataclasses import dataclass
 from sae_eap.core.types import HookName
+from jaxtyping import Float
 
 NodeName = str
 
@@ -23,7 +27,6 @@ class TensorNode(Node):
     """A node corresponding to a tensor in the model's computational graph."""
 
     hook: HookName
-    head_index: int | None = None
 
     @property
     def is_src(self) -> bool:
@@ -52,9 +55,45 @@ class SrcNode(TensorNode):
     def is_src(self) -> bool:
         return True
 
+    def get_act(
+        self,
+        act: torch.Tensor,
+    ) -> Float[torch.Tensor, "batch pos d_model"]:
+        return act
+
 
 @dataclass(frozen=True)
 class DestNode(TensorNode):
     @property
     def is_dest(self) -> bool:
         return True
+
+    def get_grad(
+        self,
+        grad: torch.Tensor,
+    ) -> Float[torch.Tensor, "batch pos d_model"]:
+        return grad
+
+
+@dataclass(frozen=True)
+class AttentionSrcNode(SrcNode):
+    """A node corresponding to an attention head in the model's computational graph."""
+
+    head_index: int
+
+    def get_act(
+        self, act: Float[torch.Tensor, "batch pos n_head d_model"]
+    ) -> Float[torch.Tensor, "batch pos d_model"]:
+        return act[:, self.head_index]
+
+
+@dataclass(frozen=True)
+class AttentionDestNode(DestNode):
+    """A node corresponding to an attention head in the model's computational graph."""
+
+    head_index: int
+
+    def get_grad(
+        self, grad: Float[torch.Tensor, "batch pos d_model"]
+    ) -> Float[torch.Tensor, "batch pos n_head d_model"]:
+        return grad[:, None, :].expand(-1, self.head_index, -1)
