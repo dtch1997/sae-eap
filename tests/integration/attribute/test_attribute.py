@@ -2,10 +2,11 @@ import pytest
 
 from sae_eap.core.types import Model
 from sae_eap.attribute import (
-    make_cache_hooks_and_tensors,
+    make_cache_hooks_and_dicts,
     get_model_caches,
     compute_node_act_cache,
     compute_node_grad_cache,
+    attribute,
 )
 from sae_eap.graph.build import build_graph
 from sae_eap.graph.index import TensorGraphIndexer
@@ -15,10 +16,7 @@ from tests.integration.attribute.helpers import make_single_prompt_handler
 
 def test_hook_lengths(ts_model: Model):
     graph = build_graph(ts_model.cfg)
-    handler = make_single_prompt_handler(ts_model)
-    hooks, _ = make_cache_hooks_and_tensors(
-        graph, handler.get_batch_size(), handler.get_n_pos()
-    )
+    hooks, _ = make_cache_hooks_and_dicts(graph)
 
     # Test hook lengths
     assert len(hooks.fwd_hooks_clean) == len(graph.src_nodes)
@@ -65,7 +63,6 @@ def test_node_act_has_correct_tensor_shape(ts_model: Model):
         assert len(act.shape) == 3
 
 
-@pytest.mark.xfail(reason="Shape error in compute_node_act_cache")
 def test_node_cache_has_correct_tensor_shape(ts_model: Model):
     graph = build_graph(ts_model.cfg)
     indexer = TensorGraphIndexer(graph)
@@ -82,3 +79,9 @@ def test_node_cache_has_correct_tensor_shape(ts_model: Model):
         assert batch_size == handler.get_batch_size()
         assert n_pos == handler.get_n_pos()
         assert d_model == ts_model.cfg.d_model
+
+
+def test_attribute(ts_model: Model):
+    graph = build_graph(ts_model.cfg)
+    handler = make_single_prompt_handler(ts_model)
+    attribute(ts_model, graph, handler)

@@ -103,12 +103,10 @@ CacheDicts = NamedTuple(
 )
 
 
-def make_cache_hooks_and_tensors(
+def make_cache_hooks_and_dicts(
     graph: TensorGraph,
-    batch_size: int = 1,
-    n_token: int = 1,
 ) -> tuple[CacheHooks, CacheDicts]:
-    """Make hooks and tensors to do attribution patching.
+    """Make hooks and tensors to cache model activations and gradients.
 
     Args:
         graph: The graph containing all nodes and edges in the model.
@@ -161,9 +159,7 @@ def get_model_caches(
     """Simple computation of activations."""
 
     # Make hooks and tensors
-    hooks, caches = make_cache_hooks_and_tensors(
-        graph, batch_size=handler.get_batch_size(), n_token=handler.get_n_pos()
-    )
+    hooks, caches = make_cache_hooks_and_dicts(graph)
 
     # Store the activations for the corrupt inputs
     with model.hooks(fwd_hooks=hooks.fwd_hooks_corrupt):

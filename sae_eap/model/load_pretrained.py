@@ -9,4 +9,5 @@ def load_model(model_name: str) -> HookedTransformer:
     )
     model.set_use_attn_result(True)
     model.set_use_hook_mlp_in(True)
+    model.set_use_split_qkv_input(True)
     return model
