@@ -8,4 +8,5 @@ def load_model(model_name: str) -> HookedTransformer:
         device=DeviceManager.instance().get_device(),
     )
     model.set_use_attn_result(True)
+    model.set_use_hook_mlp_in(True)
     return model

@@ -52,8 +52,21 @@ def test_model_cache_has_correct_tensor_shape(
         assert cache.d_model == ts_model.cfg.d_model
 
 
+def test_node_act_has_correct_tensor_shape(ts_model: Model):
+    graph = build_graph(ts_model.cfg)
+    handler = make_single_prompt_handler(ts_model)
+    act_cache, _ = get_model_caches(ts_model, graph, handler)
+
+    # Test tensor shapes
+    for src_node in graph.src_nodes:
+        hook_act = act_cache[src_node.hook]
+        assert len(hook_act.shape) >= 3
+        act = src_node.get_act(hook_act)
+        assert len(act.shape) == 3
+
+
 @pytest.mark.xfail(reason="Shape error in compute_node_act_cache")
-def test_compute_node_caches(ts_model: Model):
+def test_node_cache_has_correct_tensor_shape(ts_model: Model):
     graph = build_graph(ts_model.cfg)
     indexer = TensorGraphIndexer(graph)
     handler = make_single_prompt_handler(ts_model)

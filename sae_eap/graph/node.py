@@ -9,14 +9,11 @@ from jaxtyping import Float
 NodeName = str
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, eq=True)
 class Node:
     """Base class to represent a node in a graph."""
 
     name: NodeName
-
-    def __eq__(self, other):
-        return self.name == other.name
 
     def __repr__(self):
         return f"Node({self.name})"
@@ -35,6 +32,9 @@ class TensorNode(Node):
     @property
     def is_dest(self) -> bool:
         return False
+
+    def __repr__(self):
+        return f"TensorNode({self.name}, {self.hook})"
 
     """ Syntactic sugar for deciding what tensors to store. """
 
@@ -84,7 +84,10 @@ class AttentionSrcNode(SrcNode):
     def get_act(
         self, act: Float[torch.Tensor, "batch pos n_head d_model"]
     ) -> Float[torch.Tensor, "batch pos d_model"]:
-        return act[:, self.head_index]
+        return act[:, :, self.head_index]
+
+    def __repr__(self):
+        return f"AttentionSrcNode({self.name}, {self.hook}, head={self.head_index})"
 
 
 @dataclass(frozen=True)
@@ -96,4 +99,7 @@ class AttentionDestNode(DestNode):
     def get_grad(
         self, grad: Float[torch.Tensor, "batch pos d_model"]
     ) -> Float[torch.Tensor, "batch pos n_head d_model"]:
-        return grad[:, None, :].expand(-1, self.head_index, -1)
+        return grad[:, :, self.head_index]
+
+    def __repr__(self):
+        return f"AttentionDestNode({self.name}, {self.hook}, head={self.head_index})"
