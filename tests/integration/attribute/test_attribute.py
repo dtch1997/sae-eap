@@ -3,10 +3,10 @@ import pytest
 from sae_eap.core.types import Model
 from sae_eap.attribute import (
     make_cache_hooks_and_dicts,
-    get_model_caches,
+    compute_model_caches,
     compute_node_act_cache,
     compute_node_grad_cache,
-    attribute,
+    run_attribution,
 )
 from sae_eap.graph.build import build_graph
 from sae_eap.graph.index import TensorGraphIndexer
@@ -41,7 +41,8 @@ def test_model_cache_has_correct_tensor_shape(
 ):
     graph = build_graph(ts_model.cfg)
     handler = make_single_prompt_handler(ts_model)
-    caches = get_model_caches(ts_model, graph, handler)
+    hooks, caches = make_cache_hooks_and_dicts(graph)
+    caches = compute_model_caches(ts_model, hooks, caches, handler)
 
     # Test tensor shapes
     for cache in caches:
@@ -53,7 +54,9 @@ def test_model_cache_has_correct_tensor_shape(
 def test_node_act_has_correct_tensor_shape(ts_model: Model):
     graph = build_graph(ts_model.cfg)
     handler = make_single_prompt_handler(ts_model)
-    act_cache, _ = get_model_caches(ts_model, graph, handler)
+    hooks, caches = make_cache_hooks_and_dicts(graph)
+    caches = compute_model_caches(ts_model, hooks, caches, handler)
+    act_cache = caches.act_cache
 
     # Test tensor shapes
     for src_node in graph.src_nodes:
@@ -67,11 +70,12 @@ def test_node_cache_has_correct_tensor_shape(ts_model: Model):
     graph = build_graph(ts_model.cfg)
     indexer = TensorGraphIndexer(graph)
     handler = make_single_prompt_handler(ts_model)
-    caches = get_model_caches(ts_model, graph, handler)
+    hooks, caches = make_cache_hooks_and_dicts(graph)
+    caches = compute_model_caches(ts_model, hooks, caches, handler)
 
     # Compute node caches
-    act_cache = compute_node_act_cache(indexer.src_index, caches[0])
-    grad_cache = compute_node_grad_cache(indexer.dest_index, caches[1])
+    act_cache = compute_node_act_cache(indexer.src_index, caches.act_cache)
+    grad_cache = compute_node_grad_cache(indexer.dest_index, caches.grad_cache)
 
     # Test tensor shapes
     for cache in [act_cache, grad_cache]:
@@ -84,4 +88,5 @@ def test_node_cache_has_correct_tensor_shape(ts_model: Model):
 def test_attribute(ts_model: Model):
     graph = build_graph(ts_model.cfg)
     handler = make_single_prompt_handler(ts_model)
-    attribute(ts_model, graph, handler)
+    scores_dict = run_attribution(ts_model, graph, handler)
+    assert len(scores_dict) == len(graph.edges)

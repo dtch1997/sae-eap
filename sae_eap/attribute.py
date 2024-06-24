@@ -151,15 +151,13 @@ def make_cache_hooks_and_dicts(
     return hooks, caches
 
 
-def get_model_caches(
+def compute_model_caches(
     model: HookedTransformer,
-    graph: TensorGraph,
+    hooks: CacheHooks,
+    caches: CacheDicts,
     handler: BatchHandler,
 ) -> CacheDicts:
     """Simple computation of activations."""
-
-    # Make hooks and tensors
-    hooks, caches = make_cache_hooks_and_dicts(graph)
 
     # Store the activations for the corrupt inputs
     with model.hooks(fwd_hooks=hooks.fwd_hooks_corrupt):
@@ -244,7 +242,10 @@ def compute_attribution_scores(
     return scores
 
 
-def attribute(
+# NOTE: This might be a good function to turn into a Pipeline abstraction.
+# class AttributionScorer:
+# def run(self): ...
+def run_attribution(
     model: HookedTransformer,
     graph: TensorGraph,
     iter_batch_handler: Iterator[BatchHandler] | BatchHandler,
@@ -266,15 +267,15 @@ def attribute(
     iter_batch_handler = tqdm(iter_batch_handler, disable=quiet)
     for handler in iter_batch_handler:
         total_items += handler.get_batch_size()
-        # TODO: Add strategy for integrated gradients.
-        model_caches = get_model_caches(model, graph, handler)
+        hooks, caches = make_cache_hooks_and_dicts(graph)
+        model_caches = compute_model_caches(model, hooks, caches, handler)
         node_act_cache = compute_node_act_cache(
             indexer.src_index, model_caches.act_cache
         )
         node_grad_cache = compute_node_grad_cache(
             indexer.dest_index, model_caches.grad_cache
         )
-
+        # TODO: Add strategy for integrated gradients.
         scores = compute_attribution_scores(
             node_act_cache, node_grad_cache, model.cfg, aggregation=aggregation
         )
@@ -282,9 +283,11 @@ def attribute(
     scores_cache /= total_items
     scores_cache = scores_cache.cpu().numpy()
 
-    # Update the scores in the graph
+    scores_dict = {}
     for edge in tqdm(graph.edges, total=len(graph.edges), disable=quiet):
         score = scores_cache[
             indexer.get_src_index(edge.src), indexer.get_dest_index(edge.dest)
         ]
-        graph.set_edge_info(edge, {"score": score})
+        scores_dict[edge] = score
+
+    return scores_dict
