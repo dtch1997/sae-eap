@@ -63,8 +63,8 @@ def get_attn_nodes(
             hook=in_hook,
             head_index=head_index,
         )
-        for in_hook, letter in zip(in_hooks, letters)
         for head_index in range(n_heads)
+        for in_hook, letter in zip(in_hooks, letters)
     ]
     return src_nodes, dest_nodes
 
