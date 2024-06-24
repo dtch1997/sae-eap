@@ -22,8 +22,7 @@ def parse_model_or_config(
         )
 
 
-""" Functions to consruct nodes. """
-
+""" Functions to construct nodes. """
 
 def get_input_node() -> SrcNode:
     """Return the input node for the graph."""

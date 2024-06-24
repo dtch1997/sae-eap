@@ -63,9 +63,6 @@ def init_cache_tensor(
     )
 
 
-# Define a hook function to store a tensor
-# When doing clean forward pass, we'll want to add activations to the tensor
-# When doing corrupted forward pass, we'll want to subtract activations from the tensor
 def get_cache_hook(cache: CacheDict, add: bool = True):
     """Factory function for TransformerLens hooks that cache a value."""
 
@@ -135,11 +132,11 @@ def make_cache_hooks_and_dicts(
     # Populate the hooks and tensors.
     for node in graph.src_nodes:
         # Forward clean hook
-        hook = get_cache_hook(activation_delta_cache, add=True)
+        hook = get_cache_hook(activation_delta_cache, add=False)
         fwd_hooks_clean.append((node.hook, hook))
 
         # Forward corrupt hook
-        hook = get_cache_hook(activation_delta_cache, add=False)
+        hook = get_cache_hook(activation_delta_cache, add=True)
         fwd_hooks_corrupt.append((node.hook, hook))
 
     for node in graph.dest_nodes:
@@ -207,7 +204,9 @@ def compute_node_grad_cache(
     )
     for node, index in node_index.items():
         model_grad = model_grad_cache[node.hook]
-        node_grad_cache[:, :, index] = node.get_grad(model_grad)
+        node_grad = node.get_grad(model_grad)
+        assert len(node_grad.shape) == 3
+        node_grad_cache[:, :, index] = node_grad
     return node_grad_cache
 
 
@@ -283,7 +282,8 @@ def run_attribution(
         scores = compute_attribution_scores(
             node_act_cache, node_grad_cache, model.cfg, aggregation=aggregation
         )
-    scores_cache += scores
+        scores_cache += scores
+    
     scores_cache /= total_items
     scores_cache = scores_cache.cpu().numpy()
 
