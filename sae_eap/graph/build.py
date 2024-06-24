@@ -24,17 +24,17 @@ def parse_model_or_config(
 
 """ Functions to construct nodes. """
 
-def get_input_node() -> SrcNode:
+def build_input_node() -> SrcNode:
     """Return the input node for the graph."""
     return SrcNode(name="Input", hook="hook_embed")
 
 
-def get_output_node(n_layers: int) -> DestNode:
+def build_output_node(n_layers: int) -> DestNode:
     """Return the output node for the graph."""
     return DestNode(name="Output", hook=f"blocks.{n_layers - 1}.hook_resid_post")
 
 
-def get_mlp_nodes(layer: int) -> tuple[SrcNode, DestNode]:
+def build_mlp_nodes(layer: int) -> tuple[SrcNode, DestNode]:
     """Return src and dest nodes for the MLP block in a given layer."""
     in_hook = f"blocks.{layer}.hook_mlp_in"
     out_hook = f"blocks.{layer}.hook_mlp_out"
@@ -42,29 +42,28 @@ def get_mlp_nodes(layer: int) -> tuple[SrcNode, DestNode]:
     dest_node = DestNode(name=f"MLP.L{layer}.in", hook=out_hook)
     return src_node, dest_node
 
+def build_attn_nodes(layer: int, head: int):
+    """ Return src and dest nodes for one attention head in a given layer. """
+    in_hooks = tuple([f"blocks.{layer}.hook_{letter}_input" for letter in "qkv"])
+    out_hook = f"blocks.{layer}.attn.hook_result"
+    src_node = AttentionSrcNode(name=f"ATT.L{layer}.H{head}.out", hook=out_hook, head_index=head)
+    dest_nodes = [
+        AttentionDestNode(name=f"ATT.L{layer}.H{head}.in_{letter}", hook=in_hook, head_index=head)
+        for in_hook, letter in zip(in_hooks, "qkv")
+    ]
+    return src_node, dest_nodes
 
-def get_attn_nodes(
+
+def build_layer_attn_nodes(
     layer: int, n_heads: int
 ) -> tuple[Sequence[SrcNode], Sequence[DestNode]]:
     """Return src and dest nodes for the attention heads in a given layer."""
-    letters = "qkv"
-    in_hooks = tuple([f"blocks.{layer}.hook_{letter}_input" for letter in letters])
-    out_hook = f"blocks.{layer}.attn.hook_result"
-    src_nodes = [
-        AttentionSrcNode(
-            name=f"ATT.L{layer}.H{head_index}.out", hook=out_hook, head_index=head_index
-        )
-        for head_index in range(n_heads)
-    ]
-    dest_nodes = [
-        AttentionDestNode(
-            name=f"ATT.L{layer}.H{head_index}.in_{letter}",
-            hook=in_hook,
-            head_index=head_index,
-        )
-        for head_index in range(n_heads)
-        for in_hook, letter in zip(in_hooks, letters)
-    ]
+    src_nodes = []
+    dest_nodes = []
+    for head in range(n_heads):
+        src_node, attn_dest_nodes = build_attn_nodes(layer, head)
+        src_nodes.append(src_node)
+        dest_nodes += attn_dest_nodes
     return src_nodes, dest_nodes
 
 
@@ -76,8 +75,8 @@ def add_layer_nodes_and_edges(
     """Add nodes and edges for a single layer."""
 
     # Add the nodes
-    attn_src_nodes, attn_dest_nodes = get_attn_nodes(layer, graph.cfg.n_heads)
-    mlp_src_node, mlp_dest_node = get_mlp_nodes(layer)
+    attn_src_nodes, attn_dest_nodes = build_layer_attn_nodes(layer, graph.cfg.n_heads)
+    mlp_src_node, mlp_dest_node = build_mlp_nodes(layer)
     all_layer_nodes = attn_src_nodes + attn_dest_nodes + [mlp_src_node, mlp_dest_node]  # type: ignore
     for node in all_layer_nodes:
         graph.add_node(node)
@@ -126,7 +125,7 @@ def build_graph(
     graph = TensorGraph(cfg)
 
     # Add the input node
-    input_node = get_input_node()
+    input_node = build_input_node()
     graph.add_node(input_node)
 
     # Add the intermediate nodes
@@ -135,7 +134,7 @@ def build_graph(
         prev_src_nodes = add_layer_nodes_and_edges(graph, layer, prev_src_nodes)
 
     # Add the logit node
-    logit_node = get_output_node(graph.cfg.n_layers)
+    logit_node = build_output_node(graph.cfg.n_layers)
     for node in prev_src_nodes:
         edge = TensorEdge(node, logit_node)
         graph.add_edge(edge)
