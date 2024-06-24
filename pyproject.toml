@@ -1,6 +1,6 @@
 [project]
 name = "sae-eap"
-version = "0.1.0"
+version = "0.1.1"
 description = "EAP for SAEs"
 authors = [{ name = "Daniel Tan", email = "dtch1997@users.noreply.github.com" }]
 dependencies = [

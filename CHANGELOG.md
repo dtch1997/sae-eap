@@ -1,5 +1,37 @@
 # CHANGELOG
 
+## v0.1.1 (2024-06-24)
+
+### Fix
+
+* fix: attentionode get_act ([`8f69328`](https://github.com/dtch1997/sae-eap/commit/8f693287615af057cecc43dca4e63946395860c7))
+
+### Refactor
+
+* refactor: separate model and node cache
+
+fix: tests, types ([`ae8b6be`](https://github.com/dtch1997/sae-eap/commit/ae8b6bead66a477bc86f7693835a8042d8df502a))
+
+* refactor: node (#4)
+
+* refactor graph to generic
+
+* refactor build
+
+* minor
+
+* refactor index
+
+* add data handler
+
+* attribute  tests passing
+
+* fix tests
+
+---------
+
+Co-authored-by: Daniel Tan &lt;dtch1997@users.noreply.github.com&gt; ([`44b89c7`](https://github.com/dtch1997/sae-eap/commit/44b89c73d33b1c96bb907ca303ecd345908672cc))
+
 ## v0.1.0 (2024-06-19)
 
 ### Feature
