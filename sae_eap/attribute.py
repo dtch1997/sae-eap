@@ -283,7 +283,7 @@ def run_attribution(
             node_act_cache, node_grad_cache, model.cfg, aggregation=aggregation
         )
         scores_cache += scores
-    
+
     scores_cache /= total_items
     scores_cache = scores_cache.cpu().numpy()
 

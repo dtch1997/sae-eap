@@ -24,6 +24,7 @@ def parse_model_or_config(
 
 """ Functions to construct nodes. """
 
+
 def build_input_node() -> SrcNode:
     """Return the input node for the graph."""
     return SrcNode(name="Input", hook="hook_embed")
@@ -42,13 +43,18 @@ def build_mlp_nodes(layer: int) -> tuple[SrcNode, DestNode]:
     dest_node = DestNode(name=f"MLP.L{layer}.in", hook=out_hook)
     return src_node, dest_node
 
+
 def build_attn_nodes(layer: int, head: int):
-    """ Return src and dest nodes for one attention head in a given layer. """
+    """Return src and dest nodes for one attention head in a given layer."""
     in_hooks = tuple([f"blocks.{layer}.hook_{letter}_input" for letter in "qkv"])
     out_hook = f"blocks.{layer}.attn.hook_result"
-    src_node = AttentionSrcNode(name=f"ATT.L{layer}.H{head}.out", hook=out_hook, head_index=head)
+    src_node = AttentionSrcNode(
+        name=f"ATT.L{layer}.H{head}.out", hook=out_hook, head_index=head
+    )
     dest_nodes = [
-        AttentionDestNode(name=f"ATT.L{layer}.H{head}.in_{letter}", hook=in_hook, head_index=head)
+        AttentionDestNode(
+            name=f"ATT.L{layer}.H{head}.in_{letter}", hook=in_hook, head_index=head
+        )
         for in_hook, letter in zip(in_hooks, "qkv")
     ]
     return src_node, dest_nodes
