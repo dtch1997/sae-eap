@@ -61,6 +61,9 @@ class SrcNode(TensorNode):
     ) -> Float[torch.Tensor, "batch pos d_model"]:
         return act
 
+    def __repr__(self):
+        return f"SrcNode({self.name}, {self.hook})"
+
 
 @dataclass(frozen=True)
 class DestNode(TensorNode):
@@ -73,6 +76,9 @@ class DestNode(TensorNode):
         grad: torch.Tensor,
     ) -> Float[torch.Tensor, "batch pos d_model"]:
         return grad
+
+    def __repr__(self):
+        return f"DestNode({self.name}, {self.hook})"
 
 
 @dataclass(frozen=True)

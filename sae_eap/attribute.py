@@ -8,6 +8,7 @@ from jaxtyping import Float
 
 from tqdm import tqdm
 from einops import einsum
+from sae_eap import utils
 from sae_eap.core.types import TLForwardHook, TLBackwardHook, HookName
 from sae_eap.utils import DeviceManager
 from sae_eap.graph import TensorGraph
@@ -242,6 +243,9 @@ def compute_attribution_scores(
     return scores
 
 
+AttributionScores = dict[str, float]
+
+
 # NOTE: This might be a good function to turn into a Pipeline abstraction.
 # class AttributionScorer:
 # def run(self): ...
@@ -252,7 +256,7 @@ def run_attribution(
     *,
     aggregation="sum",
     quiet=False,
-):
+) -> AttributionScores:
     if isinstance(iter_batch_handler, BatchHandler):
         iter_batch_handler = iter([iter_batch_handler])
 
@@ -288,6 +292,23 @@ def run_attribution(
         score = scores_cache[
             indexer.get_src_index(edge.src), indexer.get_dest_index(edge.dest)
         ]
-        scores_dict[edge] = score
+        scores_dict[edge.name] = score
 
     return scores_dict
+
+
+def save_attribution_scores(
+    scores_dict: AttributionScores,
+    savedir: str,
+    filename: str = "attrib_scores",
+):
+    """Save the attribution scores to a pickle file."""
+    utils.save_obj_as_pickle(scores_dict, savedir, filename)
+
+
+def load_attribution_scores(
+    savedir: str,
+    filename: str = "attrib_scores",
+) -> AttributionScores:
+    """Load the attribution scores from a pickle file."""
+    return utils.load_obj_from_pickle(savedir, filename)

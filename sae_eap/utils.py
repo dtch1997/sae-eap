@@ -1,4 +1,7 @@
 import torch
+import pickle
+import pathlib
+
 from contextlib import contextmanager
 from sae_eap.core.patterns import Singleton
 from sae_eap.core.types import Device
@@ -50,3 +53,40 @@ def get_npos_and_input_lengths(model: HookedTransformer, inputs: list[str]):
     n_pos = 1 + tokenized.attention_mask.size(1)
     input_lengths = 1 + tokenized.attention_mask.sum(1)
     return n_pos, input_lengths
+
+
+def make_save_path(
+    savedir: str,
+    filename: str,
+    *,
+    ext: str | None = None,
+):
+    if "/" in filename:
+        raise ValueError("filename should not contain '/'")
+    save_dir = pathlib.Path(savedir)
+    save_dir.mkdir(parents=True, exist_ok=True)
+    save_path = save_dir / filename
+    if ext is not None:
+        save_path = save_path.with_suffix(ext)
+    return save_path
+
+
+def save_obj_as_pickle(
+    obj: object,
+    savedir: str,
+    filename: str,
+):
+    """Save an object as a pickle file"""
+    save_path = make_save_path(savedir, filename, ext=".pkl")
+    with open(save_path, "wb") as f:
+        pickle.dump(obj, f)
+
+
+def load_obj_from_pickle(
+    savedir: str,
+    filename: str,
+) -> object:
+    """Load an object from a pickle file"""
+    save_path = make_save_path(savedir, filename, ext=".pkl")
+    with open(save_path, "rb") as f:
+        return pickle.load(f)

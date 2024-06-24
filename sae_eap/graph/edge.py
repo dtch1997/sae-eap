@@ -19,7 +19,7 @@ class Edge:
     @property
     def name(self) -> str:
         """The name of the edge."""
-        return f"{self.parent.name}->{self.child.name}"
+        return f"{self.parent}->{self.child}"
 
     def __repr__(self):
         return f"Edge({self.name})"
