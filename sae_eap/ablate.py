@@ -1,7 +1,9 @@
 import torch
 
+from typing import Literal
 from sae_eap.core.types import HookPoint, ForwardHook
 from sae_eap.graph import TensorGraph, TensorEdge
+from sae_eap.data.handler import InputType
 from sae_eap.cache import CacheDict
 
 
@@ -42,7 +44,10 @@ def is_subgraph(circuit_graph: TensorGraph, model_graph: TensorGraph) -> bool:
     return valid_nodes and valid_edges
 
 
-def make_ablate_hooks(
+AblateSetting = Literal["noising", "denoising"]
+
+
+def make_edge_ablate_hooks(
     circuit_graph: TensorGraph,
     model_graph: TensorGraph,
     store_cache: CacheDict,
@@ -69,3 +74,19 @@ def make_ablate_hooks(
         fwd_hooks.append(fwd_hook)
 
     return fwd_hooks
+
+
+def get_clean_and_ablate_input(setting: AblateSetting) -> tuple[InputType, InputType]:
+    # In noising: We run the model on clean input and ablate with corrupt activations
+    # In denoising: We run the model on corrupt input and ablate with clean activations
+    # Reference: https://arxiv.org/abs/2404.15255
+
+    if setting == "noising":
+        clean_input = "clean"
+        ablate_input = "corrupt"
+    elif setting == "denoising":
+        clean_input = "corrupt"
+        ablate_input = "clean"
+    else:
+        raise ValueError(f"Invalid setting: {setting}")
+    return clean_input, ablate_input

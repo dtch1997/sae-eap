@@ -6,14 +6,14 @@ from jaxtyping import Float
 from typing import Literal
 from sae_eap.core.types import Model, Logits, Metric
 
+InputType = Literal["clean", "corrupt"]
+
 
 class BatchHandler(abc.ABC):
     """A class that defines how to handle a batch of data."""
 
     @abc.abstractmethod
-    def get_logits(
-        self, model: Model, input: Literal["clean", "corrupt"] = "clean"
-    ) -> Logits:
+    def get_logits(self, model: Model, input: InputType = "clean") -> Logits:
         """Get model logits by running the model on the batch."""
         pass
 

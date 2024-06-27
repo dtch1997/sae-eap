@@ -1,7 +1,7 @@
 from tqdm import tqdm
 from typing import Iterator
 
-from sae_eap.cache import init_cache_tensor
+from sae_eap.cache import init_cache_tensor, CacheDict, make_cache_setter_hook
 from sae_eap.core.types import Model
 from sae_eap.graph import TensorGraph
 from sae_eap.graph.index import TensorGraphIndexer
@@ -13,6 +13,11 @@ from sae_eap.attribute import (
     compute_node_act_cache,
     compute_node_grad_cache,
     compute_attribution_scores,
+)
+from sae_eap.ablate import (
+    AblateSetting,
+    make_edge_ablate_hooks,
+    get_clean_and_ablate_input,
 )
 
 
@@ -64,5 +69,63 @@ def run_attribution(
     return scores_dict
 
 
-def run_ablation(model: Model, circuit_graph: TensorGraph, handler: BatchHandler):
-    pass
+def run_ablation(
+    model: Model,
+    circuit_graph: TensorGraph,
+    model_graph: TensorGraph,
+    iter_batch_handler: Iterator[BatchHandler] | BatchHandler,
+    *,
+    setting: AblateSetting = "denoising",
+) -> list[float]:
+    if isinstance(iter_batch_handler, BatchHandler):
+        iter_batch_handler = iter([iter_batch_handler])
+
+    clean_input, ablate_input = get_clean_and_ablate_input(setting)
+
+    # Make caches and setter hooks
+    ablate_cache = CacheDict()
+    ablate_cache_setter_hooks = []
+    for node in model_graph.src_nodes:
+        ablate_cache_setter_hooks.append(
+            make_cache_setter_hook(ablate_cache, node.hook)
+        )
+
+    store_cache = CacheDict()
+    store_cache_setter_hooks = []
+    for node in model_graph.dest_nodes:
+        store_cache_setter_hooks.append(make_cache_setter_hook(store_cache, node.hook))
+
+    # Make the hooks to ablate edges in a circuit
+    edge_ablate_hooks = make_edge_ablate_hooks(
+        circuit_graph=circuit_graph,
+        model_graph=model_graph,
+        store_cache=store_cache,
+        ablate_cache=ablate_cache,
+    )
+
+    faithfulnesses = []
+    for handler in iter_batch_handler:
+        # Calculate clean metric
+        clean_logits = handler.get_logits(model, input=clean_input)
+        clean_metric = handler.get_metric(clean_logits)
+
+        # Populate the ablate cache
+        # Calculate ablated metric
+        with model.hooks(fwd_hooks=ablate_cache_setter_hooks):
+            fully_ablated_logits = handler.get_logits(model, input=ablate_input)
+            fully_ablated_metric = handler.get_metric(fully_ablated_logits)
+
+        # Run the model with intervention hooks
+        # Calculate circuit ablated metric
+        with model.hooks(fwd_hooks=store_cache_setter_hooks + edge_ablate_hooks):
+            circuit_ablated_logits = handler.get_logits(model, input=clean_input)
+            circuit_ablated_metric = handler.get_metric(circuit_ablated_logits)
+
+        # Faithfulness computed as (circuit_ablated - fully_ablated) / (clean - fully_ablated)
+        faithfulness = (circuit_ablated_metric - fully_ablated_metric).mean() / (
+            clean_metric - fully_ablated_metric
+        ).mean()
+        faithfulness = faithfulness.item()
+        faithfulnesses.append(faithfulness)
+
+    return faithfulnesses

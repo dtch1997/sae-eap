@@ -3,7 +3,7 @@
 import torch
 from jaxtyping import Float
 
-from sae_eap.core.types import HookName
+from sae_eap.core.types import HookName, ForwardHook
 from sae_eap.utils import DeviceManager
 
 # NOTE: variadic type annotation
@@ -52,10 +52,14 @@ def init_cache_tensor(
     )
 
 
-def make_cache_setter_hook(cache: CacheDict, add: bool = True):
+def make_cache_setter_hook(
+    cache: CacheDict, hook_name: HookName, add: bool = True
+) -> ForwardHook:
     """Factory function for TransformerLens hooks that cache a value."""
 
     def hook_fn(activations, hook):
+        assert hook_name == hook.name, f"Expected {hook_name}, got {hook.name}"
+
         acts: CacheTensor = activations.detach()
         if hook.name not in cache:
             cache[hook.name] = init_cache_tensor(acts.size(), dtype=acts.dtype)
@@ -69,4 +73,4 @@ def make_cache_setter_hook(cache: CacheDict, add: bool = True):
             print(hook.name, cache.size(), acts.size())
             raise e
 
-    return hook_fn
+    return ForwardHook(hook_name, hook_fn)
