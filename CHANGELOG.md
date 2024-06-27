@@ -1,5 +1,51 @@
 # CHANGELOG
 
+## v0.2.0 (2024-06-27)
+
+### Chore
+
+* chore: mark test as xfail ([`2a9a15f`](https://github.com/dtch1997/sae-eap/commit/2a9a15f1d5c16c5b7cfd99adfc99297ff215cc91))
+
+### Feature
+
+* feat: pruning, evaluation (#11)
+
+* wip: single-batch debugging
+
+* single-batch in original notebook
+
+* fix: scores not added inside loop
+
+* wip add pruning algorithms
+
+* fix formatting
+
+* delete pickle files
+
+* rafactor
+
+* refactor
+
+* refactor
+
+* wip walkthrough
+
+---------
+
+Co-authored-by: Daniel Tan &lt;dtch1997@users.noreply.github.com&gt; ([`51d8223`](https://github.com/dtch1997/sae-eap/commit/51d8223ddc81942619192c20adb23abb6890b7ec))
+
+### Refactor
+
+* refactor: attribute ([`397b366`](https://github.com/dtch1997/sae-eap/commit/397b3667113616232de87c6257310cf59594ccd7))
+
+* refactor: var names ([`a7e1904`](https://github.com/dtch1997/sae-eap/commit/a7e190450f7dcadbd3cc5dac5737771ce08d4777))
+
+### Unknown
+
+* add code to export attrib scores in example ([`fc84984`](https://github.com/dtch1997/sae-eap/commit/fc84984a97b8ea651b7d3567e4ba9489e9fa777a))
+
+* mwe for run_attribution function ([`34943c1`](https://github.com/dtch1997/sae-eap/commit/34943c1ae09df3b09a68b1bd09ef4d17aa350d98))
+
 ## v0.1.1 (2024-06-24)
 
 ### Fix
