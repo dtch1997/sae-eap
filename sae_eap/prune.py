@@ -44,7 +44,6 @@ class PruningPipeline(Pruner):
     def prune(self, graph: TensorGraph, scores: AttributionScores):
         for pruner in self.pruners:
             pruner.prune(graph, scores)
-        return graph
 
 
 class DeadNodePruner(Pruner):

@@ -1,5 +1,3 @@
-# type: ignore
-
 import torch
 
 
@@ -70,17 +68,17 @@ def make_cache_hooks_and_dicts(
     # Populate the hooks and tensors.
     for node in graph.src_nodes:
         # Forward clean hook
-        hook = make_cache_setter_hook(activation_delta_cache, add=False)
-        fwd_hooks_clean.append((node.hook, hook))
+        hook = make_cache_setter_hook(activation_delta_cache, node.hook, add=False)
+        fwd_hooks_clean.append(hook)
 
         # Forward corrupt hook
-        hook = make_cache_setter_hook(activation_delta_cache, add=True)
-        fwd_hooks_corrupt.append((node.hook, hook))
+        hook = make_cache_setter_hook(activation_delta_cache, node.hook, add=True)
+        fwd_hooks_corrupt.append(hook)
 
     for node in graph.dest_nodes:
         # Backward clean hook
-        hook = make_cache_setter_hook(gradient_cache, add=True)
-        bwd_hooks_clean.append((node.hook, hook))
+        hook = make_cache_setter_hook(gradient_cache, node.hook, add=True)
+        bwd_hooks_clean.append(hook)
 
     hooks = CacheHooks(fwd_hooks_clean, fwd_hooks_corrupt, bwd_hooks_clean)
     caches = CacheDicts(activation_delta_cache, gradient_cache)
@@ -96,11 +94,11 @@ def compute_model_caches(
     """Simple computation of activations."""
 
     # Store the activations for the corrupt inputs
-    with model.hooks(fwd_hooks=hooks.fwd_hooks_corrupt):
+    with model.hooks(fwd_hooks=hooks.fwd_hooks_corrupt):  # type: ignore
         handler.get_logits(model, input="corrupt")
 
     # Store the activations and gradients for the clean inputs
-    with model.hooks(fwd_hooks=hooks.fwd_hooks_clean, bwd_hooks=hooks.bwd_hooks_clean):
+    with model.hooks(fwd_hooks=hooks.fwd_hooks_clean, bwd_hooks=hooks.bwd_hooks_clean):  # type: ignore
         logits = handler.get_logits(model, input="clean")
         metric = handler.get_metric(logits)
         metric.backward()
@@ -197,4 +195,6 @@ def load_attribution_scores(
     filename: str = "attrib_scores",
 ) -> AttributionScores:
     """Load the attribution scores from a pickle file."""
-    return utils.load_obj_from_pickle(savedir, filename)
+    obj = utils.load_obj_from_pickle(savedir, filename)
+    assert isinstance(obj, dict), f"Expected dict, got {type(obj)}"
+    return obj

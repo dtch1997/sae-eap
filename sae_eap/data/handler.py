@@ -74,6 +74,17 @@ class SinglePromptHandler(BatchHandler):
                 f"Expected the number of tokens to be the same for clean and corrupt prompts; got {self.clean_tokens.shape[1]} and {self.corrupt_tokens.shape[1]}."
             )
 
+    def __repr__(self):
+        # Multi line formatting
+        return (
+            f"SinglePromptHandler(\n"
+            f"    clean_prompt={self.clean_prompt},\n"
+            f"    corrupt_prompt={self.corrupt_prompt},\n"
+            f"    answer={self.answer},\n"
+            f"    wrong_answer={self.wrong_answer}\n"
+            f")"
+        )
+
     def tokenize(self, model: Model):
         self.clean_tokens = model.to_tokens(self.clean_prompt)
         self.corrupt_tokens = model.to_tokens(self.corrupt_prompt)

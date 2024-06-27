@@ -90,24 +90,26 @@ def run_ablation(
             make_cache_setter_hook(ablate_cache, node.hook)
         )
 
-    store_cache = CacheDict()
-    store_cache_setter_hooks = []
-    for node in model_graph.dest_nodes:
-        store_cache_setter_hooks.append(make_cache_setter_hook(store_cache, node.hook))
+    clean_cache = CacheDict()
+    clean_cache_setter_hooks = []
+    for node in model_graph.src_nodes:
+        clean_cache_setter_hooks.append(make_cache_setter_hook(clean_cache, node.hook))
 
     # Make the hooks to ablate edges in a circuit
     edge_ablate_hooks = make_edge_ablate_hooks(
         circuit_graph=circuit_graph,
         model_graph=model_graph,
-        store_cache=store_cache,
+        clean_cache=clean_cache,
         ablate_cache=ablate_cache,
     )
 
     faithfulnesses = []
     for handler in iter_batch_handler:
+        # Populate the clean cache
         # Calculate clean metric
-        clean_logits = handler.get_logits(model, input=clean_input)
-        clean_metric = handler.get_metric(clean_logits)
+        with model.hooks(fwd_hooks=clean_cache_setter_hooks):
+            clean_logits = handler.get_logits(model, input=clean_input)
+            clean_metric = handler.get_metric(clean_logits)
 
         # Populate the ablate cache
         # Calculate ablated metric
@@ -117,7 +119,7 @@ def run_ablation(
 
         # Run the model with intervention hooks
         # Calculate circuit ablated metric
-        with model.hooks(fwd_hooks=store_cache_setter_hooks + edge_ablate_hooks):
+        with model.hooks(fwd_hooks=edge_ablate_hooks):  # type: ignore
             circuit_ablated_logits = handler.get_logits(model, input=clean_input)
             circuit_ablated_metric = handler.get_metric(circuit_ablated_logits)
 

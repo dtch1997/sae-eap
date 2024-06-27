@@ -51,6 +51,14 @@ class Graph(Generic[TNode, TEdge]):
             edges.append(self.edge_cls(src, dest))
         return edges
 
+    def has_node(self, node: TNode) -> bool:
+        """Check if a node exists in the graph."""
+        return self.graph.has_node(node)
+
+    def has_edge(self, edge: TEdge) -> bool:
+        """Check if an edge exists in the graph."""
+        return self.graph.has_edge(edge.parent, edge.child)
+
     def get_children(self, node: TNode) -> set[TNode]:
         """Get the children of a node."""
         return set(self.graph.successors(node))

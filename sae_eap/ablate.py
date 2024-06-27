@@ -8,7 +8,7 @@ from sae_eap.cache import CacheDict
 
 
 def make_edge_ablation_hook(
-    ablate_cache: CacheDict, store_cache: CacheDict, edge: TensorEdge
+    ablate_cache: CacheDict, clean_cache: CacheDict, edge: TensorEdge
 ) -> ForwardHook:
     """Makes a forward hook for an edge in the model graph.
 
@@ -22,26 +22,36 @@ def make_edge_ablation_hook(
         assert (
             hook.name == dest_node.hook
         ), f"Expected hook name {dest_node.hook}, got {hook.name}"
-        dest_act = activations
 
         # Get the activation delta of the src nodes
         model_ablate_act = ablate_cache[src_node.hook]
-        model_store_act = store_cache[src_node.hook]
+        model_clean_act = clean_cache[src_node.hook]
         src_ablate_act = src_node.get_act(model_ablate_act)
-        src_store_act = src_node.get_act(model_store_act)
+        src_store_act = src_node.get_act(model_clean_act)
         src_act_delta = src_ablate_act - src_store_act  # TODO: check sign.
 
-        # Set the activation delta of the dest nodes
-        return dest_act + src_act_delta
+        # Set the activation based on activation of the dest nodes
+        model_dest_act = activations
+        # First, read the dest node's act from the model
+        dest_act = dest_node.get_act(model_dest_act)
+        # Then, compute the new dest act by adding the src act delta
+        new_dest_act = dest_act + src_act_delta
+        # Finally, write the act back to the model act
+        dest_node.set_act(model_dest_act, new_dest_act)
+        return activations
 
     return ForwardHook(hook_name=dest_node.hook, hook_fn=hook_fn)
 
 
 def is_subgraph(circuit_graph: TensorGraph, model_graph: TensorGraph) -> bool:
     """Check if the circuit graph is a subgraph of the model graph."""
-    valid_nodes = set(circuit_graph.nodes).issubset(set(model_graph.nodes))
-    valid_edges = set(circuit_graph.edges).issubset(set(model_graph.edges))
-    return valid_nodes and valid_edges
+    for node in circuit_graph.nodes:
+        if not model_graph.has_node(node):
+            return False
+    for edge in circuit_graph.edges:
+        if not model_graph.has_edge(edge):
+            return False
+    return True
 
 
 AblateSetting = Literal["noising", "denoising"]
@@ -50,7 +60,7 @@ AblateSetting = Literal["noising", "denoising"]
 def make_edge_ablate_hooks(
     circuit_graph: TensorGraph,
     model_graph: TensorGraph,
-    store_cache: CacheDict,
+    clean_cache: CacheDict,
     ablate_cache: CacheDict,
 ) -> list[ForwardHook]:
     # TODO: Write compliant docstring
@@ -68,9 +78,9 @@ def make_edge_ablate_hooks(
 
     fwd_hooks = []
     for edge in model_graph.edges:
-        if edge in circuit_graph.edges:
+        if circuit_graph.has_edge(edge):
             continue
-        fwd_hook = make_edge_ablation_hook(ablate_cache, store_cache, edge)
+        fwd_hook = make_edge_ablation_hook(ablate_cache, clean_cache, edge)
         fwd_hooks.append(fwd_hook)
 
     return fwd_hooks
