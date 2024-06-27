@@ -3,92 +3,30 @@
 import torch
 
 
-from typing import Iterator, NamedTuple
-from jaxtyping import Float
-
-from tqdm import tqdm
+from typing import NamedTuple
 from einops import einsum
+
 from sae_eap import utils
-from sae_eap.core.types import TLForwardHook, TLBackwardHook, HookName
-from sae_eap.utils import DeviceManager
+from sae_eap.core.types import ForwardHook, BackwardHook
 from sae_eap.graph import TensorGraph
 from sae_eap.graph.node import SrcNode, DestNode
-from sae_eap.graph.index import TensorGraphIndexer, TensorNodeIndex
+from sae_eap.graph.index import TensorNodeIndex
+from sae_eap.cache import (
+    CacheDict,
+    CacheTensor,
+    init_cache_tensor,
+    make_cache_setter_hook,
+)
 from sae_eap.data.handler import BatchHandler
+
 from transformer_lens import HookedTransformer, HookedTransformerConfig
-
-# NOTE: variadic type annotation
-# There can be arbitrarily many dimensiosn after the first two
-CacheTensor = Float[torch.Tensor, "batch pos * d_model"]
-
-
-class CacheDict(dict):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
-    def __getitem__(self, key: HookName) -> CacheTensor:
-        return super().__getitem__(key)
-
-    def __setitem__(self, key: HookName, value: CacheTensor):
-        super().__setitem__(key, value)
-
-    def __repr__(self):
-        return f"CacheDict({super().__repr__()})"
-
-    @property
-    def batch_size(self) -> int:
-        return next(iter(self.values())).size(0)
-
-    @property
-    def n_pos(self) -> int:
-        return next(iter(self.values())).size(1)
-
-    @property
-    def d_model(self) -> int:
-        return next(iter(self.values())).size(-1)
-
-
-def init_cache_tensor(
-    shape: tuple[int, ...],
-    device: str | None = None,
-    dtype: torch.dtype = torch.float32,
-):
-    """Initialize a cache tensor."""
-    if device is None:
-        device = DeviceManager.instance().get_device()
-    return torch.zeros(
-        shape,
-        device=device,
-        dtype=dtype,
-    )
-
-
-def get_cache_hook(cache: CacheDict, add: bool = True):
-    """Factory function for TransformerLens hooks that cache a value."""
-
-    def hook_fn(activations, hook):
-        acts: CacheTensor = activations.detach()
-        if hook.name not in cache:
-            cache[hook.name] = init_cache_tensor(acts.size(), dtype=acts.dtype)
-        try:
-            if add:
-                cache[hook.name] += acts
-            else:
-                cache[hook.name] -= acts
-        except RuntimeError as e:
-            # Some useful debugging information
-            print(hook.name, cache.size(), acts.size())
-            raise e
-
-    return hook_fn
-
 
 CacheHooks = NamedTuple(
     "CacheHooks",
     [
-        ("fwd_hooks_clean", list[tuple[HookName, TLForwardHook]]),
-        ("fwd_hooks_corrupt", list[tuple[HookName, TLForwardHook]]),
-        ("bwd_hooks_clean", list[tuple[HookName, TLBackwardHook]]),
+        ("fwd_hooks_clean", list[ForwardHook]),
+        ("fwd_hooks_corrupt", list[ForwardHook]),
+        ("bwd_hooks_clean", list[BackwardHook]),
     ],
 )
 
@@ -132,16 +70,16 @@ def make_cache_hooks_and_dicts(
     # Populate the hooks and tensors.
     for node in graph.src_nodes:
         # Forward clean hook
-        hook = get_cache_hook(activation_delta_cache, add=False)
+        hook = make_cache_setter_hook(activation_delta_cache, add=False)
         fwd_hooks_clean.append((node.hook, hook))
 
         # Forward corrupt hook
-        hook = get_cache_hook(activation_delta_cache, add=True)
+        hook = make_cache_setter_hook(activation_delta_cache, add=True)
         fwd_hooks_corrupt.append((node.hook, hook))
 
     for node in graph.dest_nodes:
         # Backward clean hook
-        hook = get_cache_hook(gradient_cache, add=True)
+        hook = make_cache_setter_hook(gradient_cache, add=True)
         bwd_hooks_clean.append((node.hook, hook))
 
     hooks = CacheHooks(fwd_hooks_clean, fwd_hooks_corrupt, bwd_hooks_clean)
@@ -243,58 +181,6 @@ def compute_attribution_scores(
 
 
 AttributionScores = dict[str, float]
-
-
-# NOTE: This might be a good function to turn into a Pipeline abstraction.
-# class AttributionScorer:
-# def run(self): ...
-def run_attribution(
-    model: HookedTransformer,
-    graph: TensorGraph,
-    iter_batch_handler: Iterator[BatchHandler] | BatchHandler,
-    *,
-    aggregation="sum",
-    quiet=False,
-) -> AttributionScores:
-    if isinstance(iter_batch_handler, BatchHandler):
-        iter_batch_handler = iter([iter_batch_handler])
-
-    # Initialize the cache tensor
-    indexer = TensorGraphIndexer(graph)
-    scores_cache = init_cache_tensor(
-        shape=(len(graph.src_nodes), len(graph.dest_nodes))
-    )
-
-    # Compute the attribution scores
-    total_items = 0
-    iter_batch_handler = tqdm(iter_batch_handler, disable=quiet)
-    for handler in iter_batch_handler:
-        total_items += handler.get_batch_size()
-        hooks, caches = make_cache_hooks_and_dicts(graph)
-        model_caches = compute_model_caches(model, hooks, caches, handler)
-        node_act_cache = compute_node_act_cache(
-            indexer.src_index, model_caches.act_cache
-        )
-        node_grad_cache = compute_node_grad_cache(
-            indexer.dest_index, model_caches.grad_cache
-        )
-        # TODO: Add strategy for integrated gradients.
-        scores = compute_attribution_scores(
-            node_act_cache, node_grad_cache, model.cfg, aggregation=aggregation
-        )
-        scores_cache += scores
-
-    scores_cache /= total_items
-    scores_cache = scores_cache.cpu().numpy()
-
-    scores_dict = {}
-    for edge in tqdm(graph.edges, total=len(graph.edges), disable=quiet):
-        score = scores_cache[
-            indexer.get_src_index(edge.src), indexer.get_dest_index(edge.dest)
-        ]
-        scores_dict[edge.name] = score
-
-    return scores_dict
 
 
 def save_attribution_scores(

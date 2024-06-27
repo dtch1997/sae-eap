@@ -41,3 +41,11 @@ class TensorEdge(Edge):
 
     parent: SrcNode
     child: DestNode
+
+    @property
+    def src(self) -> SrcNode:
+        return self.parent
+
+    @property
+    def dest(self) -> DestNode:
+        return self.child

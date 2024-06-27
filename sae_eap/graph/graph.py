@@ -162,4 +162,4 @@ class TensorGraph(Graph[TensorNode, TensorEdge]):
 
     def copy(self) -> TensorGraph:
         """Return a copy of the graph."""
-        return TensorGraph(cfg=self.cfg, graph=self.graph.copy())
+        return TensorGraph(cfg=self.cfg, graph=self.graph.copy())  # type: ignore
