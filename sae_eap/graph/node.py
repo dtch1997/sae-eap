@@ -36,6 +36,19 @@ class TensorNode(Node):
     def __repr__(self):
         return f"TensorNode({self.name}, {self.hook})"
 
+    def get_act(
+        self,
+        model_act: torch.Tensor,
+    ) -> Float[torch.Tensor, "batch pos d_model"]:
+        return model_act
+
+    def set_act(
+        self,
+        model_act: torch.Tensor,
+        node_act: Float[torch.Tensor, "batch pos d_model"],
+    ) -> None:
+        model_act[:] = node_act
+
     """ Syntactic sugar for deciding what tensors to store. """
 
     @property
@@ -54,12 +67,6 @@ class SrcNode(TensorNode):
     @property
     def is_src(self) -> bool:
         return True
-
-    def get_act(
-        self,
-        act: torch.Tensor,
-    ) -> Float[torch.Tensor, "batch pos d_model"]:
-        return act
 
     def __repr__(self):
         return f"SrcNode({self.name}, {self.hook})"
@@ -88,9 +95,16 @@ class AttentionSrcNode(SrcNode):
     head_index: int
 
     def get_act(
-        self, act: Float[torch.Tensor, "batch pos n_head d_model"]
+        self, model_act: Float[torch.Tensor, "batch pos n_head d_model"]
     ) -> Float[torch.Tensor, "batch pos d_model"]:
-        return act[:, :, self.head_index]
+        return model_act[:, :, self.head_index]
+
+    def set_act(
+        self,
+        model_act: Float[torch.Tensor, "batch pos n_head d_model"],
+        node_act: Float[torch.Tensor, "batch pos d_model"],
+    ) -> None:
+        model_act[:, :, self.head_index] = node_act
 
     def __repr__(self):
         return f"AttentionSrcNode({self.name}, {self.hook}, head={self.head_index})"

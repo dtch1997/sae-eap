@@ -2,14 +2,15 @@ import torch
 import transformer_lens as tl
 
 from jaxtyping import Float, Int
+from collections import namedtuple
 from typing import Protocol, Callable, Literal
-from transformer_lens.hook_points import HookPoint
 
 Device = Literal["cpu", "cuda", "mps"]
 LayerIndex = int
 FeatureIndex = int
 TokenIndex = int
 
+HookPoint = tl.hook_points.HookPoint
 HookName = str
 HookNameFilterFn = Callable[[HookName], bool]
 
@@ -24,11 +25,17 @@ MetricFn = Callable[[Model, Tokens], Metric]
 SaeFamily = Literal["res-jb", "att-kk", "tres-dc"]
 
 
-class TLForwardHook(Protocol):
-    def __call__(self, orig: torch.Tensor, hook: HookPoint) -> torch.Tensor:
+class TLForwardHookFn(Protocol):
+    def __call__(self, activations: torch.Tensor, hook: HookPoint) -> torch.Tensor:
         raise NotImplementedError
 
 
-class TLBackwardHook(Protocol):
-    def __call__(self, orig: torch.Tensor, hook: HookPoint) -> tuple[torch.Tensor]:
+class TLBackwardHookFn(Protocol):
+    def __call__(
+        self, activations: torch.Tensor, hook: HookPoint
+    ) -> tuple[torch.Tensor]:
         raise NotImplementedError
+
+
+ForwardHook = namedtuple("ForwardHook", ["hook_name", "hook_fn"])
+BackwardHook = namedtuple("BackwardHook", ["hook_name", "hook_fn"])

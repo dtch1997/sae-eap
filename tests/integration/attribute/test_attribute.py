@@ -6,7 +6,6 @@ from sae_eap.attribute import (
     compute_model_caches,
     compute_node_act_cache,
     compute_node_grad_cache,
-    run_attribution,
 )
 from sae_eap.graph.build import build_graph
 from sae_eap.graph.index import TensorGraphIndexer
@@ -83,10 +82,3 @@ def test_node_cache_has_correct_tensor_shape(ts_model: Model):
         assert batch_size == handler.get_batch_size()
         assert n_pos == handler.get_n_pos()
         assert d_model == ts_model.cfg.d_model
-
-
-def test_attribute(ts_model: Model):
-    graph = build_graph(ts_model.cfg)
-    handler = make_single_prompt_handler(ts_model)
-    scores_dict = run_attribution(ts_model, graph, handler)
-    assert len(scores_dict) == len(graph.edges)

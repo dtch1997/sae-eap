@@ -6,14 +6,14 @@ from jaxtyping import Float
 from typing import Literal
 from sae_eap.core.types import Model, Logits, Metric
 
+InputType = Literal["clean", "corrupt"]
+
 
 class BatchHandler(abc.ABC):
     """A class that defines how to handle a batch of data."""
 
     @abc.abstractmethod
-    def get_logits(
-        self, model: Model, input: Literal["clean", "corrupt"] = "clean"
-    ) -> Logits:
+    def get_logits(self, model: Model, input: InputType = "clean") -> Logits:
         """Get model logits by running the model on the batch."""
         pass
 
@@ -73,6 +73,17 @@ class SinglePromptHandler(BatchHandler):
             raise ValueError(
                 f"Expected the number of tokens to be the same for clean and corrupt prompts; got {self.clean_tokens.shape[1]} and {self.corrupt_tokens.shape[1]}."
             )
+
+    def __repr__(self):
+        # Multi line formatting
+        return (
+            f"SinglePromptHandler(\n"
+            f"    clean_prompt={self.clean_prompt},\n"
+            f"    corrupt_prompt={self.corrupt_prompt},\n"
+            f"    answer={self.answer},\n"
+            f"    wrong_answer={self.wrong_answer}\n"
+            f")"
+        )
 
     def tokenize(self, model: Model):
         self.clean_tokens = model.to_tokens(self.clean_prompt)
