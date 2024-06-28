@@ -5,10 +5,10 @@ from __future__ import annotations
 import abc
 
 from sae_eap.graph.edge import TensorEdge
-from sae_eap.graph.node import SrcNode, DestNode, AttentionSrcNode
+from sae_eap.graph.node import TensorNode, AttentionNode
 from sae_eap.graph.build import build_attn_nodes, build_mlp_nodes
 from sae_eap.graph.graph import TensorGraph
-from sae_eap.attribute import AttributionScores
+from sae_eap.attribute import EdgeAttributionScores
 
 
 class Pruner(abc.ABC):
@@ -23,7 +23,7 @@ class Pruner(abc.ABC):
         return abs(score) if self.absolute else score
 
     @abc.abstractmethod
-    def prune(self, graph: TensorGraph, scores: AttributionScores):
+    def prune(self, graph: TensorGraph, scores: EdgeAttributionScores):
         raise NotImplementedError
 
 
@@ -41,7 +41,7 @@ class PruningPipeline(Pruner):
         self.pruners = []
         return self
 
-    def prune(self, graph: TensorGraph, scores: AttributionScores):
+    def prune(self, graph: TensorGraph, scores: EdgeAttributionScores):
         for pruner in self.pruners:
             pruner.prune(graph, scores)
 
@@ -54,7 +54,7 @@ class DeadNodePruner(Pruner):
     - The node is a destination node with no parents.
     """
 
-    def prune(self, graph: TensorGraph, scores: AttributionScores) -> None:
+    def prune(self, graph: TensorGraph, scores: EdgeAttributionScores) -> None:
         for node in graph.src_nodes:
             if len(graph.get_children(node)) == 0:
                 graph.remove_node(node)
@@ -71,7 +71,7 @@ class ThresholdEdgePruner(Pruner):
         super().__init__(absolute)
         self.threshold = threshold
 
-    def prune(self, graph: TensorGraph, scores: AttributionScores) -> None:
+    def prune(self, graph: TensorGraph, scores: EdgeAttributionScores) -> None:
         # Remove edges with score below threshold
         for edge in graph.edges:
             score = scores[edge.name]
@@ -87,7 +87,7 @@ class TopNEdgePruner(Pruner):
         super().__init__(absolute)
         self.n_edges = n_edges
 
-    def prune(self, graph: TensorGraph, scores: AttributionScores) -> None:
+    def prune(self, graph: TensorGraph, scores: EdgeAttributionScores) -> None:
         edges_sorted_by_score_descending = sorted(
             list(graph.edges),
             key=lambda edge: self.maybe_abs(scores[edge.name]),
@@ -101,13 +101,13 @@ class TopNEdgePruner(Pruner):
             graph.add_edge(edge)
 
 
-def get_dest_nodes_for_src_node(graph, src_node: SrcNode) -> list[DestNode]:
+def get_dest_nodes_for_src_node(graph, src_node: TensorNode) -> list[TensorNode]:
     if "mlp" in src_node.name:
         _, dest_node = build_mlp_nodes(graph)
         return [dest_node]
 
     elif "attn" in src_node.name:
-        assert isinstance(src_node, AttentionSrcNode)
+        assert isinstance(src_node, AttentionNode)
         _, dest_nodes = build_attn_nodes(graph, src_node.head_index)
         return dest_nodes  # type: ignore
 
@@ -116,11 +116,12 @@ def get_dest_nodes_for_src_node(graph, src_node: SrcNode) -> list[DestNode]:
 
 
 def get_incoming_edges_for_dest_node(
-    graph: TensorGraph, dest_node: DestNode
+    graph: TensorGraph, dest_node: TensorNode
 ) -> list[TensorEdge]:
     incoming_edges = []
+    assert dest_node.is_dest
     for parent in graph.get_parents(dest_node):
-        assert isinstance(parent, SrcNode)
+        assert parent.is_src
         edge = graph.edge_cls(parent, dest_node)
         incoming_edges.append(edge)
     return incoming_edges
@@ -133,7 +134,7 @@ class GreedyEdgePruner(Pruner):
         super().__init__(absolute)
         self.n_edges = n_edges
 
-    def prune(self, graph: TensorGraph, scores: AttributionScores) -> None:
+    def prune(self, graph: TensorGraph, scores: EdgeAttributionScores) -> None:
         # TODO: the implementation is a bit cursed
         raise NotImplementedError
 

@@ -1,7 +1,7 @@
 from typing import Sequence
 
 from sae_eap.graph.graph import TensorGraph
-from sae_eap.graph.node import SrcNode, DestNode, AttentionSrcNode, AttentionDestNode
+from sae_eap.graph.node import TensorNode, AttentionNode
 from sae_eap.graph.edge import TensorEdge
 
 from transformer_lens import HookedTransformer, HookedTransformerConfig
@@ -25,22 +25,24 @@ def parse_model_or_config(
 """ Functions to construct nodes. """
 
 
-def build_input_node() -> SrcNode:
+def build_input_node() -> TensorNode:
     """Return the input node for the graph."""
-    return SrcNode(name="Input", hook="hook_embed")
+    return TensorNode(name="Input", hook="hook_embed").as_src()
 
 
-def build_output_node(n_layers: int) -> DestNode:
+def build_output_node(n_layers: int) -> TensorNode:
     """Return the output node for the graph."""
-    return DestNode(name="Output", hook=f"blocks.{n_layers - 1}.hook_resid_post")
+    return TensorNode(
+        name="Output", hook=f"blocks.{n_layers - 1}.hook_resid_post"
+    ).as_dest()
 
 
-def build_mlp_nodes(layer: int) -> tuple[SrcNode, DestNode]:
+def build_mlp_nodes(layer: int) -> tuple[TensorNode, TensorNode]:
     """Return src and dest nodes for the MLP block in a given layer."""
     in_hook = f"blocks.{layer}.hook_mlp_in"
     out_hook = f"blocks.{layer}.hook_mlp_out"
-    src_node = SrcNode(name=f"MLP.L{layer}.out", hook=in_hook)
-    dest_node = DestNode(name=f"MLP.L{layer}.in", hook=out_hook)
+    src_node = TensorNode(name=f"MLP.L{layer}.out", hook=in_hook).as_src()
+    dest_node = TensorNode(name=f"MLP.L{layer}.in", hook=out_hook).as_dest()
     return src_node, dest_node
 
 
@@ -48,13 +50,13 @@ def build_attn_nodes(layer: int, head: int):
     """Return src and dest nodes for one attention head in a given layer."""
     in_hooks = tuple([f"blocks.{layer}.hook_{letter}_input" for letter in "qkv"])
     out_hook = f"blocks.{layer}.attn.hook_result"
-    src_node = AttentionSrcNode(
+    src_node = AttentionNode(
         name=f"ATT.L{layer}.H{head}.out", hook=out_hook, head_index=head
-    )
+    ).as_src()
     dest_nodes = [
-        AttentionDestNode(
+        AttentionNode(
             name=f"ATT.L{layer}.H{head}.in_{letter}", hook=in_hook, head_index=head
-        )
+        ).as_dest()
         for in_hook, letter in zip(in_hooks, "qkv")
     ]
     return src_node, dest_nodes
@@ -62,7 +64,7 @@ def build_attn_nodes(layer: int, head: int):
 
 def build_layer_attn_nodes(
     layer: int, n_heads: int
-) -> tuple[Sequence[SrcNode], Sequence[DestNode]]:
+) -> tuple[Sequence[TensorNode], Sequence[TensorNode]]:
     """Return src and dest nodes for the attention heads in a given layer."""
     src_nodes = []
     dest_nodes = []
@@ -76,8 +78,8 @@ def build_layer_attn_nodes(
 def add_layer_nodes_and_edges(
     graph: TensorGraph,
     layer: int,
-    prev_src_nodes: list[SrcNode],
-) -> list[SrcNode]:
+    prev_src_nodes: list[TensorNode],
+) -> list[TensorNode]:
     """Add nodes and edges for a single layer."""
 
     # Add the nodes
@@ -135,7 +137,7 @@ def build_graph(
     graph.add_node(input_node)
 
     # Add the intermediate nodes
-    prev_src_nodes: list[SrcNode] = [input_node]
+    prev_src_nodes: list[TensorNode] = [input_node]
     for layer in range(graph.cfg.n_layers):
         prev_src_nodes = add_layer_nodes_and_edges(graph, layer, prev_src_nodes)
 

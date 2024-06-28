@@ -1,5 +1,3 @@
-import pytest
-
 from sae_eap.core.types import Model
 from sae_eap.runner import run_ablation, run_attribution
 from sae_eap.graph.build import build_graph
@@ -16,7 +14,6 @@ def make_pruner():
     )
 
 
-@pytest.mark.xfail(reason="Needs a refactor of nodes")
 def test_run_ablation(ts_model: Model):
     graph = build_graph(ts_model.cfg)
     handler = make_single_prompt_handler(ts_model)

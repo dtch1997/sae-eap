@@ -7,7 +7,7 @@ from sae_eap.graph import TensorGraph
 from sae_eap.graph.index import TensorGraphIndexer
 from sae_eap.data.handler import BatchHandler
 from sae_eap.attribute import (
-    AttributionScores,
+    EdgeAttributionScores,
     make_cache_hooks_and_dicts,
     compute_model_caches,
     compute_node_act_cache,
@@ -28,7 +28,7 @@ def run_attribution(
     *,
     aggregation="sum",
     quiet=False,
-) -> AttributionScores:
+) -> EdgeAttributionScores:
     if isinstance(iter_batch_handler, BatchHandler):
         iter_batch_handler = iter([iter_batch_handler])
 

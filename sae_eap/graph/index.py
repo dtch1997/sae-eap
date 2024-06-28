@@ -1,7 +1,7 @@
 # type: ignore
 from typing import Sequence
 from sae_eap.graph.graph import TensorGraph
-from sae_eap.graph.node import TensorNode, SrcNode, DestNode
+from sae_eap.graph.node import TensorNode
 
 # Unique index for each node in the graph.
 TensorNodeIndex = int
@@ -15,11 +15,13 @@ def build_node_index(nodes: Sequence[TensorNode]) -> dict[TensorNode, TensorNode
     return index
 
 
+# TODO: refactor into generic Indexer class that supports any hashable key.
+# TODO: instead of combining src and dest in a single index, have two separate indexers.
 class TensorGraphIndexer:
     """A class to index nodes in a graph."""
 
-    src_index: dict[SrcNode, TensorNodeIndex]
-    dest_index: dict[DestNode, TensorNodeIndex]
+    src_index: dict[TensorNode, TensorNodeIndex]
+    dest_index: dict[TensorNode, TensorNodeIndex]
 
     def __init__(self, graph: TensorGraph):
         self.build_index(graph)
