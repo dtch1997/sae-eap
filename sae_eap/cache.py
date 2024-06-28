@@ -24,6 +24,11 @@ class CacheDict(dict):
     def __repr__(self):
         return f"CacheDict({super().__repr__()})"
 
+    def zero(self):
+        """Zero out all the tensors in the cache."""
+        for key in self.keys():
+            self[key].zero_()
+
     @property
     def batch_size(self) -> int:
         return next(iter(self.values())).size(0)
@@ -57,20 +62,15 @@ def make_cache_setter_hook(
 ) -> ForwardHook:
     """Factory function for TransformerLens hooks that cache a value."""
 
-    def hook_fn(activations, hook):
+    def hook_fn(activations, hook) -> None:
         assert hook_name == hook.name, f"Expected {hook_name}, got {hook.name}"
+        assert hook_name not in cache, f"Hook {hook_name} already in cache."
 
         acts: CacheTensor = activations.detach()
-        if hook.name not in cache:
-            cache[hook.name] = init_cache_tensor(acts.size(), dtype=acts.dtype)
-        try:
-            if add:
-                cache[hook.name] += acts
-            else:
-                cache[hook.name] -= acts
-        except RuntimeError as e:
-            # Some useful debugging information
-            print(hook.name, cache.size(), acts.size())
-            raise e
+        cache[hook.name] = init_cache_tensor(acts.size(), dtype=acts.dtype)
+        if add:
+            cache[hook.name] += acts
+        else:
+            cache[hook.name] -= acts
 
     return ForwardHook(hook_name, hook_fn)

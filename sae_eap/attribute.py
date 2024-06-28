@@ -69,15 +69,18 @@ def make_cache_hooks_and_dicts(
         # Forward clean hook
         hook = make_cache_setter_hook(activation_delta_cache, node.hook, add=False)
         fwd_hooks_clean.append(hook)
+        del hook
 
         # Forward corrupt hook
         hook = make_cache_setter_hook(activation_delta_cache, node.hook, add=True)
         fwd_hooks_corrupt.append(hook)
+        del hook
 
     for node in graph.dest_nodes:
         # Backward clean hook
         hook = make_cache_setter_hook(gradient_cache, node.hook, add=True)
         bwd_hooks_clean.append(hook)
+        del hook
 
     hooks = CacheHooks(fwd_hooks_clean, fwd_hooks_corrupt, bwd_hooks_clean)
     caches = CacheDicts(activation_delta_cache, gradient_cache)
