@@ -5,30 +5,30 @@ from typing import NamedTuple
 from einops import einsum
 
 from sae_eap import utils
-from sae_eap.core.types import ForwardHook, BackwardHook
 from sae_eap.graph import TensorGraph, EdgeName, TensorNode
 from sae_eap.graph.index import TensorNodeIndex
 from sae_eap.cache import (
     CacheDict,
     CacheTensor,
+    CacheHook,
     init_cache_tensor,
-    make_cache_setter_hook,
+    make_cache_adder_hooks_for_unique_hook_names,
 )
 from sae_eap.data.handler import BatchHandler
 
 from transformer_lens import HookedTransformer, HookedTransformerConfig
 
-CacheHooks = NamedTuple(
-    "CacheHooks",
+AttributionCacheHooks = NamedTuple(
+    "AttributionCacheHooks",
     [
-        ("fwd_hooks_clean", list[ForwardHook]),
-        ("fwd_hooks_corrupt", list[ForwardHook]),
-        ("bwd_hooks_clean", list[BackwardHook]),
+        ("fwd_hooks_clean", list[CacheHook]),
+        ("fwd_hooks_corrupt", list[CacheHook]),
+        ("bwd_hooks_clean", list[CacheHook]),
     ],
 )
 
-CacheDicts = NamedTuple(
-    "CacheDicts",
+AttributionCacheDicts = NamedTuple(
+    "AttributionCacheDicts",
     [
         ("act_cache", CacheDict),
         ("grad_cache", CacheDict),
@@ -38,7 +38,7 @@ CacheDicts = NamedTuple(
 
 def make_cache_hooks_and_dicts(
     graph: TensorGraph,
-) -> tuple[CacheHooks, CacheDicts]:
+) -> tuple[AttributionCacheHooks, AttributionCacheDicts]:
     """Make hooks and tensors to cache model activations and gradients.
 
     Args:
@@ -64,35 +64,32 @@ def make_cache_hooks_and_dicts(
     activation_delta_cache = CacheDict()
     gradient_cache = CacheDict()
 
-    # Populate the hooks and tensors.
-    for node in graph.src_nodes:
-        # Forward clean hook
-        hook = make_cache_setter_hook(activation_delta_cache, node.hook, add=False)
-        fwd_hooks_clean.append(hook)
-        del hook
+    # Get the set of hook names where we need activations.
+    # This ensures that we only add one hook per hook point.
+    src_hook_name_set = set(node.hook for node in graph.src_nodes)
+    dest_hook_name_set = set(node.hook for node in graph.dest_nodes)
 
-        # Forward corrupt hook
-        hook = make_cache_setter_hook(activation_delta_cache, node.hook, add=True)
-        fwd_hooks_corrupt.append(hook)
-        del hook
+    fwd_hooks_clean = make_cache_adder_hooks_for_unique_hook_names(
+        src_hook_name_set, activation_delta_cache, add=False
+    )
+    fwd_hooks_corrupt = make_cache_adder_hooks_for_unique_hook_names(
+        src_hook_name_set, activation_delta_cache, add=True
+    )
+    bwd_hooks_clean = make_cache_adder_hooks_for_unique_hook_names(
+        dest_hook_name_set, gradient_cache, add=True
+    )
 
-    for node in graph.dest_nodes:
-        # Backward clean hook
-        hook = make_cache_setter_hook(gradient_cache, node.hook, add=True)
-        bwd_hooks_clean.append(hook)
-        del hook
-
-    hooks = CacheHooks(fwd_hooks_clean, fwd_hooks_corrupt, bwd_hooks_clean)
-    caches = CacheDicts(activation_delta_cache, gradient_cache)
+    hooks = AttributionCacheHooks(fwd_hooks_clean, fwd_hooks_corrupt, bwd_hooks_clean)  # type: ignore
+    caches = AttributionCacheDicts(activation_delta_cache, gradient_cache)
     return hooks, caches
 
 
 def compute_model_caches(
     model: HookedTransformer,
-    hooks: CacheHooks,
-    caches: CacheDicts,
+    hooks: AttributionCacheHooks,
+    caches: AttributionCacheDicts,
     handler: BatchHandler,
-) -> CacheDicts:
+) -> AttributionCacheDicts:
     """Simple computation of activations."""
 
     # Store the activations for the corrupt inputs

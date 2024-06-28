@@ -3,12 +3,15 @@
 import torch
 from jaxtyping import Float
 
-from sae_eap.core.types import HookName, ForwardHook
+from typing import Iterable
+from collections import namedtuple
+from sae_eap.core.types import HookName
 from sae_eap.utils import DeviceManager
 
 # NOTE: variadic type annotation
 # There can be 1 or more dimensions after the first two
 CacheTensor = Float[torch.Tensor, "batch pos * d_model"]
+CacheHook = namedtuple("CacheHook", ["hook_name", "hook_fn"])
 
 
 class CacheDict(dict):
@@ -23,11 +26,6 @@ class CacheDict(dict):
 
     def __repr__(self):
         return f"CacheDict({super().__repr__()})"
-
-    def zero(self):
-        """Zero out all the tensors in the cache."""
-        for key in self.keys():
-            self[key].zero_()
 
     @property
     def batch_size(self) -> int:
@@ -57,14 +55,16 @@ def init_cache_tensor(
     )
 
 
-def make_cache_setter_hook(
+def make_cache_adder_hook(
     cache: CacheDict, hook_name: HookName, add: bool = True
-) -> ForwardHook:
-    """Factory function for TransformerLens hooks that cache a value."""
+) -> CacheHook:
+    """Factory function for TransformerLens hooks that adds a value to a cache"""
 
     def hook_fn(activations, hook) -> None:
-        assert hook_name == hook.name, f"Expected {hook_name}, got {hook.name}"
-        assert hook_name not in cache, f"Hook {hook_name} already in cache."
+        if hook_name != hook.name:
+            raise RuntimeError(f"Expected {hook_name}, got {hook.name}")
+        if hook_name in cache:
+            raise RuntimeError(f"Hook {hook_name} already in cache.")
 
         acts: CacheTensor = activations.detach()
         cache[hook.name] = init_cache_tensor(acts.size(), dtype=acts.dtype)
@@ -73,4 +73,19 @@ def make_cache_setter_hook(
         else:
             cache[hook.name] -= acts
 
-    return ForwardHook(hook_name, hook_fn)
+    return CacheHook(hook_name, hook_fn)
+
+
+def make_cache_adder_hooks_for_unique_hook_names(
+    hook_names: Iterable[HookName], cache: CacheDict, add: bool = True
+) -> list[CacheHook]:
+    """A utility function to make one adder hook per hook point.
+
+    Deduplicates the nodes by hook name and makes a hook for each unique hook name.
+    """
+    deduped_hook_names = set(hook_names)
+    hooks = []
+    for hook_name in deduped_hook_names:
+        hook = make_cache_adder_hook(cache, hook_name, add=add)
+        hooks.append(hook)
+    return hooks
