@@ -109,13 +109,13 @@ def run_ablation(
     for handler in iter_batch_handler:
         # Populate the clean cache
         # Calculate clean metric
-        with model.hooks(fwd_hooks=clean_cache_setter_hooks):
+        with model.hooks(fwd_hooks=clean_cache_setter_hooks):  # type: ignore
             clean_logits = handler.get_logits(model, input=clean_input)
             clean_metric = handler.get_metric(clean_logits)
 
         # Populate the ablate cache
         # Calculate ablated metric
-        with model.hooks(fwd_hooks=ablate_cache_setter_hooks):
+        with model.hooks(fwd_hooks=ablate_cache_setter_hooks):  # type: ignore
             fully_ablated_logits = handler.get_logits(model, input=ablate_input)
             fully_ablated_metric = handler.get_metric(fully_ablated_logits)
 
