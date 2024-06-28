@@ -1,3 +1,9 @@
+"""Defines lightweight caching utilities.
+
+Here, we opt to create our own caching setup to:
+- support multiple hooks writing to the same cache dict.
+"""
+
 # type: ignore
 
 import torch
@@ -63,8 +69,6 @@ def make_cache_adder_hook(
     def hook_fn(activations, hook) -> None:
         if hook_name != hook.name:
             raise RuntimeError(f"Expected {hook_name}, got {hook.name}")
-        if hook_name in cache:
-            raise RuntimeError(f"Hook {hook_name} already in cache.")
 
         acts: CacheTensor = activations.detach()
         cache[hook.name] = init_cache_tensor(acts.size(), dtype=acts.dtype)
