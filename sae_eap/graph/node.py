@@ -2,36 +2,43 @@ from __future__ import annotations
 
 import torch
 
-from dataclasses import dataclass
+from dataclasses import dataclass, asdict
 from sae_eap.core.types import HookName
 from jaxtyping import Float
 
 NodeName = str
 
 
-@dataclass(frozen=True, eq=True)
+@dataclass(frozen=True, eq=True, kw_only=True)
 class Node:
     """Base class to represent a node in a graph."""
 
     name: NodeName
+    is_src: bool = False
+    is_dest: bool = False
 
     def __repr__(self):
         return f"Node({self.name})"
 
+    def as_src(self, value: bool = True):
+        dict = asdict(self)
+        dict["is_src"] = value
+        return self.__class__(**dict)
 
-@dataclass(frozen=True)
+    def as_dest(self, value: bool = True):
+        dict = asdict(self)
+        dict["is_dest"] = value
+        return self.__class__(**dict)
+
+
+@dataclass(frozen=True, eq=True, kw_only=True)
 class TensorNode(Node):
     """A node corresponding to a tensor in the model's computational graph."""
 
+    name: NodeName
     hook: HookName
-
-    @property
-    def is_src(self) -> bool:
-        return False
-
-    @property
-    def is_dest(self) -> bool:
-        return False
+    is_src: bool = False
+    is_dest: bool = False
 
     def __repr__(self):
         return f"TensorNode({self.name}, {self.hook})"
@@ -49,47 +56,22 @@ class TensorNode(Node):
     ) -> None:
         model_act[:] = node_act
 
-    """ Syntactic sugar for deciding what tensors to store. """
-
-    @property
-    def requires_grad(self) -> bool:
-        """Indicates whether we need to keep track of gradients at this hook."""
-        return self.is_dest
-
-    @property
-    def requires_act(self) -> bool:
-        """Indicates whether we need to keep track of activations at this hook."""
-        return self.is_src
-
-
-@dataclass(frozen=True)
-class SrcNode(TensorNode):
-    @property
-    def is_src(self) -> bool:
-        return True
-
-    def __repr__(self):
-        return f"SrcNode({self.name}, {self.hook})"
-
-
-@dataclass(frozen=True)
-class DestNode(TensorNode):
-    @property
-    def is_dest(self) -> bool:
-        return True
-
     def get_grad(
         self,
-        grad: torch.Tensor,
+        model_grad: torch.Tensor,
     ) -> Float[torch.Tensor, "batch pos d_model"]:
-        return grad
+        return model_grad
 
-    def __repr__(self):
-        return f"DestNode({self.name}, {self.hook})"
+    def set_grad(
+        self,
+        model_grad: torch.Tensor,
+        node_grad: Float[torch.Tensor, "batch pos d_model"],
+    ) -> None:
+        model_grad[:] = node_grad
 
 
-@dataclass(frozen=True)
-class AttentionSrcNode(SrcNode):
+@dataclass(frozen=True, eq=True, kw_only=True)
+class AttentionNode(TensorNode):
     """A node corresponding to an attention head in the model's computational graph."""
 
     head_index: int
@@ -106,20 +88,17 @@ class AttentionSrcNode(SrcNode):
     ) -> None:
         model_act[:, :, self.head_index] = node_act
 
-    def __repr__(self):
-        return f"AttentionSrcNode({self.name}, {self.hook}, head={self.head_index})"
-
-
-@dataclass(frozen=True)
-class AttentionDestNode(DestNode):
-    """A node corresponding to an attention head in the model's computational graph."""
-
-    head_index: int
-
     def get_grad(
-        self, grad: Float[torch.Tensor, "batch pos d_model"]
+        self, model_grad: Float[torch.Tensor, "batch pos d_model"]
     ) -> Float[torch.Tensor, "batch pos n_head d_model"]:
-        return grad[:, :, self.head_index]
+        return model_grad[:, :, self.head_index]
+
+    def set_grad(
+        self,
+        model_grad: Float[torch.Tensor, "batch pos n_head d_model"],
+        node_grad: Float[torch.Tensor, "batch pos d_model"],
+    ) -> None:
+        model_grad[:, :, self.head_index] = node_grad
 
     def __repr__(self):
-        return f"AttentionDestNode({self.name}, {self.hook}, head={self.head_index})"
+        return f"AttentionNode({self.name}, {self.hook}, head={self.head_index})"

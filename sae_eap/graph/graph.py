@@ -1,13 +1,13 @@
 from __future__ import annotations
 
-from typing import Any, Sequence, TypeVar, Generic, Type
+from typing import Any, Sequence, TypeVar, Generic, Type, cast
 
 import networkx as nx
 from transformer_lens import HookedTransformerConfig
 
 from sae_eap.core.constants import GPT_2_SMALL_MODEL_CONFIG
 from sae_eap.graph.edge import Edge, TensorEdge
-from sae_eap.graph.node import Node, TensorNode, SrcNode, DestNode
+from sae_eap.graph.node import Node, TensorNode
 
 TNode = TypeVar("TNode", bound=Node)
 TEdge = TypeVar("TEdge", bound=Edge)
@@ -45,6 +45,16 @@ class Graph(Generic[TNode, TEdge]):
         return list(self.graph.nodes)
 
     @property
+    def src_nodes(self) -> Sequence[TNode]:
+        """Get the source nodes in the graph."""
+        return [node for node in self.graph.nodes if node.is_src]  # type: ignore
+
+    @property
+    def dest_nodes(self) -> Sequence[TNode]:
+        """Get the destination nodes in the graph."""
+        return [node for node in self.graph.nodes if node.is_dest]  # type: ignore
+
+    @property
     def edges(self) -> Sequence[TEdge]:
         edges = []
         for src, dest in self.graph.edges:
@@ -69,7 +79,7 @@ class Graph(Generic[TNode, TEdge]):
 
     def to_json(self) -> dict[str, Any]:
         """Convert the graph to a JSON object."""
-        graph_data = nx.node_link_data(self.graph)  # type: ignore
+        graph_data = nx.node_link_data(self.graph)
         return {"graph": graph_data}
 
     @classmethod
@@ -80,7 +90,8 @@ class Graph(Generic[TNode, TEdge]):
 
     def copy(self) -> Graph:
         """Return a copy of the graph."""
-        return Graph(graph=self.graph.copy())  # type: ignore
+        new_nx_digraph = cast(nx.DiGraph, self.graph.copy())
+        return Graph(graph=new_nx_digraph)
 
     """ Methods to manipulate the graph """
 
@@ -145,16 +156,6 @@ class TensorGraph(Graph[TensorNode, TensorEdge]):
         super().__init__(graph=graph, node_cls=TensorNode, edge_cls=TensorEdge)
         self.cfg = cfg
 
-    @property
-    def src_nodes(self) -> Sequence[SrcNode]:
-        """Get the source nodes in the graph."""
-        return [node for node in self.nodes if node.is_src]  # type: ignore
-
-    @property
-    def dest_nodes(self) -> Sequence[DestNode]:
-        """Get the destination nodes in the graph."""
-        return [node for node in self.nodes if node.is_dest]  # type: ignore
-
     def to_json(self) -> dict[str, Any]:
         """Convert the graph to a JSON object."""
         cfg_data = self.cfg.to_dict()
@@ -170,4 +171,5 @@ class TensorGraph(Graph[TensorNode, TensorEdge]):
 
     def copy(self) -> TensorGraph:
         """Return a copy of the graph."""
-        return TensorGraph(cfg=self.cfg, graph=self.graph.copy())  # type: ignore
+        new_nx_digraph = cast(nx.DiGraph, self.graph.copy())
+        return TensorGraph(cfg=self.cfg, graph=new_nx_digraph)

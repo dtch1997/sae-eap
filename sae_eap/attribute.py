@@ -6,8 +6,7 @@ from einops import einsum
 
 from sae_eap import utils
 from sae_eap.core.types import ForwardHook, BackwardHook
-from sae_eap.graph import TensorGraph
-from sae_eap.graph.node import SrcNode, DestNode
+from sae_eap.graph import TensorGraph, EdgeName, TensorNode
 from sae_eap.graph.index import TensorNodeIndex
 from sae_eap.cache import (
     CacheDict,
@@ -107,7 +106,7 @@ def compute_model_caches(
 
 
 def compute_node_act_cache(
-    node_index: dict[SrcNode, TensorNodeIndex],
+    node_index: dict[TensorNode, TensorNodeIndex],
     model_act_cache: CacheDict,
 ) -> CacheTensor:
     node_act_cache = init_cache_tensor(
@@ -127,7 +126,7 @@ def compute_node_act_cache(
 
 
 def compute_node_grad_cache(
-    node_index: dict[DestNode, TensorNodeIndex],
+    node_index: dict[TensorNode, TensorNodeIndex],
     model_grad_cache: CacheDict,
 ) -> CacheTensor:
     node_grad_cache = init_cache_tensor(
@@ -178,11 +177,11 @@ def compute_attribution_scores(
     return scores
 
 
-AttributionScores = dict[str, float]
+EdgeAttributionScores = dict[EdgeName, float]
 
 
 def save_attribution_scores(
-    scores_dict: AttributionScores,
+    scores_dict: EdgeAttributionScores,
     savedir: str,
     filename: str = "attrib_scores",
 ):
@@ -193,7 +192,7 @@ def save_attribution_scores(
 def load_attribution_scores(
     savedir: str,
     filename: str = "attrib_scores",
-) -> AttributionScores:
+) -> EdgeAttributionScores:
     """Load the attribution scores from a pickle file."""
     obj = utils.load_obj_from_pickle(savedir, filename)
     assert isinstance(obj, dict), f"Expected dict, got {type(obj)}"

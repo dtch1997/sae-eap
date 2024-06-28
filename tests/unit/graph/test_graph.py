@@ -7,12 +7,12 @@ from sae_eap.graph.edge import Edge
 
 @pytest.fixture
 def nodes():
-    return [Node("A"), Node("B"), Node("C")]
+    return [Node(name="A"), Node(name="B"), Node(name="C")]
 
 
 @pytest.fixture
 def edges():
-    return [Edge(Node("A"), Node("B")), Edge(Node("B"), Node("C"))]
+    return [Edge(Node(name="A"), Node(name="B")), Edge(Node(name="B"), Node(name="C"))]
 
 
 def test_graph_nodes(nodes, edges):
