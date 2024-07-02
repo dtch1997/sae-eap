@@ -47,7 +47,7 @@ For an overview of current functionality, see our [walkthrough notebook](example
 
 ## Roadmap
 
-Currently, the library is a work-in-progress. Here's an overview of current and planned features. 
+Currently, the library is a work-in-progress. Here's an overview of current tasks. 
 
 - [ ] Basic functionality
     - [x] Implement basic graph operations (`sae_eap.graph`)
@@ -55,12 +55,13 @@ Currently, the library is a work-in-progress. Here's an overview of current and 
     - [ ] Implement graph visualization
     - [x] Implement building graph from a model (`sae_eap.graph.build`) 
     - [ ] Implement building graph from a model + SAE
+- [ ] Implement circuit discovery (EAP)
+    - [x] Implement computing attribution scores (`sae_eap.attribute`)
+    - [ ] Test that attribution scores match original (`notebooks/test_our_attrib_matches_original.ipynb`)
+    - [x] Implement pruning edges by score (`sae_eap.prune`)
 - [ ] Implement circuit evaluation
     - [ ] Implement ablating a circuit (`sae_eap.ablate`)
-- [x] Implement circuit discovery (EAP)
-    - [x] Implement computing attribution scores (`sae_eap.attribute`)
-    - [x] Implement pruning edges by score (`sae_eap.prune`)
-
+    - [ ] Test that recovered circuits match reference implementation
 
 # Detailed User Guide
 
