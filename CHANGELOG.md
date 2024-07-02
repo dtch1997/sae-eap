@@ -1,5 +1,40 @@
 # CHANGELOG
 
+## v0.2.1 (2024-07-02)
+
+### Fix
+
+* fix: attribution calculation (#14)
+
+* add test for pruner
+
+* move walkthrough to top-level directory
+
+* ignore pickle files
+
+* test caches match TL caches
+
+* add motivation for cache dict
+
+* fix viz
+
+* delete incorrect test
+
+We will produce one hook for every hook point in the model which needs to be cached
+This is different from the number of src nodes in the graph
+
+* rename file to avoid pytest issue
+
+---------
+
+Co-authored-by: Daniel CH Tan &lt;dtch1997@users.noreply.github.com&gt; ([`8dc8e5a`](https://github.com/dtch1997/sae-eap/commit/8dc8e5a9672690121c95336e6616b8f9ddbb4a9e))
+
+### Unknown
+
+* improve docs, readme ([`8bbd72e`](https://github.com/dtch1997/sae-eap/commit/8bbd72ec134a4a13cabcadb26f4b2c9a36ef29b5))
+
+* refactor nodes ([`f4fb9f1`](https://github.com/dtch1997/sae-eap/commit/f4fb9f166822345454ebb61cd1021cb835f3304f))
+
 ## v0.2.0 (2024-06-27)
 
 ### Chore
