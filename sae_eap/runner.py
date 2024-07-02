@@ -1,7 +1,11 @@
 from tqdm import tqdm
 from typing import Iterator
 
-from sae_eap.cache import init_cache_tensor, CacheDict, make_cache_setter_hook
+from sae_eap.cache import (
+    init_cache_tensor,
+    CacheDict,
+    make_cache_adder_hooks_for_unique_hook_names,
+)
 from sae_eap.core.types import Model
 from sae_eap.graph import TensorGraph
 from sae_eap.graph.index import TensorGraphIndexer
@@ -83,17 +87,15 @@ def run_ablation(
     clean_input, ablate_input = get_clean_and_ablate_input(setting)
 
     # Make caches and setter hooks
+    src_hook_name_set = set(node.hook for node in model_graph.src_nodes)
     ablate_cache = CacheDict()
-    ablate_cache_setter_hooks = []
-    for node in model_graph.src_nodes:
-        ablate_cache_setter_hooks.append(
-            make_cache_setter_hook(ablate_cache, node.hook)
-        )
-
+    ablate_cache_setter_hooks = make_cache_adder_hooks_for_unique_hook_names(
+        src_hook_name_set, ablate_cache, add=True
+    )
     clean_cache = CacheDict()
-    clean_cache_setter_hooks = []
-    for node in model_graph.src_nodes:
-        clean_cache_setter_hooks.append(make_cache_setter_hook(clean_cache, node.hook))
+    clean_cache_setter_hooks = make_cache_adder_hooks_for_unique_hook_names(
+        src_hook_name_set, clean_cache, add=False
+    )
 
     # Make the hooks to ablate edges in a circuit
     edge_ablate_hooks = make_edge_ablate_hooks(
@@ -107,13 +109,13 @@ def run_ablation(
     for handler in iter_batch_handler:
         # Populate the clean cache
         # Calculate clean metric
-        with model.hooks(fwd_hooks=clean_cache_setter_hooks):
+        with model.hooks(fwd_hooks=clean_cache_setter_hooks):  # type: ignore
             clean_logits = handler.get_logits(model, input=clean_input)
             clean_metric = handler.get_metric(clean_logits)
 
         # Populate the ablate cache
         # Calculate ablated metric
-        with model.hooks(fwd_hooks=ablate_cache_setter_hooks):
+        with model.hooks(fwd_hooks=ablate_cache_setter_hooks):  # type: ignore
             fully_ablated_logits = handler.get_logits(model, input=ablate_input)
             fully_ablated_metric = handler.get_metric(fully_ablated_logits)
 

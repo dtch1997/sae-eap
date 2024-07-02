@@ -13,16 +13,6 @@ from sae_eap.graph.index import TensorGraphIndexer
 from tests.integration.attribute.helpers import make_single_prompt_handler
 
 
-def test_hook_lengths(ts_model: Model):
-    graph = build_graph(ts_model.cfg)
-    hooks, _ = make_cache_hooks_and_dicts(graph)
-
-    # Test hook lengths
-    assert len(hooks.fwd_hooks_clean) == len(graph.src_nodes)
-    assert len(hooks.fwd_hooks_corrupt) == len(graph.src_nodes)
-    assert len(hooks.bwd_hooks_clean) == len(graph.dest_nodes)
-
-
 @pytest.mark.skip("Not implemented")
 def test_forward_hooks_work(ts_model: Model):
     """Test that running model with forward hooks modifies the act cache."""

@@ -9,6 +9,7 @@ import matplotlib.cm
 
 from sae_eap.graph.edge import Edge
 from sae_eap.graph.graph import TensorGraph
+from sae_eap.attribute import EdgeAttributionScores
 
 
 EDGE_TYPE_COLORS = {
@@ -93,11 +94,13 @@ def generate_random_color(colorscheme: str) -> str:
 
 
 def get_color(edge: Edge):
-    return EDGE_TYPE_COLORS[edge.type]
+    # TODO: support different edge colors
+    return "#000000"
 
 
 def to_graphviz(
     graph: TensorGraph,
+    edge_scores: EdgeAttributionScores,
     colorscheme: str = "Pastel2",
     minimum_penwidth: float = 0.6,
     maximum_penwidth: float = 5.0,
@@ -122,7 +125,7 @@ def to_graphviz(
 
     for node in graph.nodes:
         g.add_node(
-            node.name,
+            node.hook,
             fillcolor=colors[node.name],
             color="black",
             style="filled, rounded",
@@ -130,12 +133,12 @@ def to_graphviz(
             fontname="Helvetica",
         )
 
-    scores = graph.get_all_edge_scores()
+    scores: list[float] = list(edge_scores.values())
     max_score = max(scores)
     min_score = min(scores)
 
     for edge in graph.edges:
-        score = graph.get_edge_score(edge)
+        score = edge_scores[edge.name]
         normalized_score = (
             (abs(score) - min_score) / (max_score - min_score)
             if max_score != min_score
@@ -143,8 +146,8 @@ def to_graphviz(
         )
         penwidth = max(minimum_penwidth, normalized_score * maximum_penwidth)
         g.add_edge(
-            edge.parent.name,
-            edge.child.name,
+            edge.parent.hook,
+            edge.child.hook,
             penwidth=str(penwidth),
             color=get_color(edge),
         )
